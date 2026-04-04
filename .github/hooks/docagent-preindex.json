@@ -1,0 +1,15 @@
+{
+  "name": "docagent-preindex",
+  "description": "Run DocAgent ingest step before agent-run (example hook).",
+  "event": "PreAgentRun",
+  "command": [
+    "python3",
+    "-m",
+    "tools.docagent.cli",
+    "ingest",
+    "--repo",
+    ".",
+    "--out",
+    "tools/docagent/data/extracted.jsonl"
+  ]
+}
