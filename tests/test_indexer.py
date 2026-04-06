@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tools.docagent.index import index_jsonl
 
-def test_indexer_creates_index(tmp_path):
+def test_indexer_creates_index(tmp_path: Path):
     input_file = tmp_path / "input.jsonl"
     data = {"file": "sample.py", "line": 1, "doc": "hello world"}
     input_file.write_text(json.dumps(data, ensure_ascii=False) + "\n", encoding='utf-8')

@@ -1,0 +1,27 @@
+$schema: https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json
+version: "0.2"
+allowCompoundWords: true
+useGitignore: true
+words: []
+dictionaryDefinitions:
+  - addWords: true
+    name: agentic-wiki
+    path: cspell/dict.agentic-wiki.txt
+dictionaries:
+  - en-us
+  - en-gb
+  - git
+  - csharp
+  - dotnet
+  - python
+  - python-common
+  - powershell
+  - bash
+  - shellscript
+  - win32
+  # -- Custom Dictionaries --
+  - agentic-wiki
+ignorePaths:
+  - "*.code-workspace"
+  - ".editorconfig"
+  - ".gitignore"

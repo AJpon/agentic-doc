@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tools.docagent.ingest import ingest_repo
 
-def test_ingest_generates_jsonl(tmp_path):
+def test_ingest_generates_jsonl(tmp_path: Path):
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     sample = repo_dir / "sample.py"

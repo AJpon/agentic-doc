@@ -1,4 +1,6 @@
-/.venv
+.venv
+dist/
+build/
 __pycache__/
 tools/docagent/data/
 docs/site/
