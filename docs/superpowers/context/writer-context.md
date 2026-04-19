@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `tools.docagent/templates/basic_page.tpl.md` — 使用テンプレート。

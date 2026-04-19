@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "summarize_module"
+name: "summarize-module"
 description: "モジュール単位で要約を生成するスキル"
 ---
 

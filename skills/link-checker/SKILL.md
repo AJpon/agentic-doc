@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "link_checker"
+name: "link-checker"
 description: "Markdown 内のリンク整合性をチェックするスキル"
 ---
 

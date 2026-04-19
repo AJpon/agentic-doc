@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `docs/superpowers/plans/` — 既存のプランを参照。

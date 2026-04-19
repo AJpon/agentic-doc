@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "metadata_enricher"
+name: "metadata-enricher"
 description: "抽出データにタグや参照情報を追加するスキル"
 ---
 

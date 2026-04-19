@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `tools.docagent/generate.py` — ドキュメント生成のフロー理解。

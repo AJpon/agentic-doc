@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `docs/` — 既存のWiki構造を把握。

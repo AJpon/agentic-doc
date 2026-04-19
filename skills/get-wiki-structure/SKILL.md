@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "get_wiki_structure"
+name: "get-wiki-structure"
 description: "Wiki のファイル・ディレクトリ構造を解析して返すスキル"
 ---
 

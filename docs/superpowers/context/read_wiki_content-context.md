@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `docs/wiki/` — 実際のMarkdownコンテンツ。

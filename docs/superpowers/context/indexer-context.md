@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `tools.docagent/index.py` — インデックス生成の主ロジック。

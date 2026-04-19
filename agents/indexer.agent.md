@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 # indexer.agent
 短い説明: 抽出済みJSONLを読み込み、`index.json`（埋め込みなし）または`index_with_embeddings.json`を生成します。
 

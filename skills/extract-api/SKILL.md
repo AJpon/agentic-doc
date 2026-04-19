@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "extract_api"
+name: "extract-api"
 description: "ソースコードからAPI（関数／クラス）の情報を抽出するスキル"
 ---
 

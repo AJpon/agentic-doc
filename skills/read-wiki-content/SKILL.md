@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "read_wiki_content"
+name: "read-wiki-content"
 description: "Markdown ページを読み、メタデータや本文を抽出するスキル"
 ---
 

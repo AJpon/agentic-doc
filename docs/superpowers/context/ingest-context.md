@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `tools/docagent/ingest.py` — 実装エントリ。リポジトリ走査ロジックと出力フォーマットを確認するため。

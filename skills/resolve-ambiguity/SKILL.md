@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "resolve_ambiguity"
+name: "resolve-ambiguity"
 description: "曖昧な参照や不明点を問い合わせて解決するスキル"
 ---
 

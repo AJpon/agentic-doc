@@ -1,6 +1,5 @@
-<!-- これはサブエージェントが生成しました -->
 ---
-name: "template_renderer"
+name: "template-renderer"
 description: "Jinja2 互換テンプレートでページをレンダリングするスキル"
 ---
 

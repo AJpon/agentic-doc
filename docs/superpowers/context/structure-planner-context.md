@@ -1,4 +1,3 @@
-<!-- これはサブエージェントが生成しました -->
 ## Files I Need
 ### Must See
 - `tools.docagent/data/index.json` — ページ候補とメタ情報。
