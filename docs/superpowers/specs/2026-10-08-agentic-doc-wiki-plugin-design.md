@@ -1,7 +1,7 @@
 # agentic-doc: コードベース Wiki 生成・保守プラグイン 設計
 
 - 作成日: 2026-10-08
-- 状態: 設計確定（実行方式のみ未決。「未決事項」を参照）
+- 状態: 設計確定（実行方式とハーネスの検証記録: `docs/superpowers/research/2026-10-08-runtime-and-harness-probes.md`）
 - 移植元: `AJpon/fbx-view` PR #21（`.claude/workflows/wiki.js` と `.claude/workflows/scripts/`）
 
 ## 1. 背景と目的
@@ -61,18 +61,31 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 │   │   ├── SKILL.md                  #   モードの振り分け、help、次の操作の案内、縮退動作の手順
 │   │   ├── references/               #   overview（全体フロー）、各フェーズの手順、執筆規約
 │   │   ├── schemas/                  #   設定・カタログ・各フェーズ出力の JSON Schema
-│   │   ├── scripts/                  #   決定的な処理（8 章）
+│   │   ├── scripts/                  #   決定的な処理（8 章）。入口は agentic_doc.py
 │   │   └── assets/work/.gitignore.in #   作業ディレクトリの雛形（中身は `*` の 1 行）
 │   └── wiki-setup/                   # 設定ファイルの作成・更新
 │       ├── SKILL.md
 │       └── references/
 └── com.anthropic.claude-code/
-    └── workflows/wiki.js             # Claude Code 専用のオーケストレーション
+    └── workflows/wiki-run.js         # Claude Code 専用のオーケストレーション（meta.name は wiki-run）
 ```
 
 - Workflow の各エージェントには、「`<スキルのパス>/references/<フェーズ>.md` を読んで従え。対象ページは〜」という短い指示とスキーマだけを渡す。プロンプトの本文は Workflow に書かない。
 - 外部プラグイン（元実装の `deep-wiki:wiki-researcher`）には依存しない。
 - Copilot 用の名前空間ディレクトリは最初は作らない。スキルだけで呼び出せるため。
+
+**マニフェスト**
+
+- ルートの `plugin.json` は Agent Plugins 1.0 形式で、`$schema` に `https://agent-plugins.org/schemas/1.0.0/plugin.schema.json` を書く。Copilot（VS Code）と Codex がこれを読む。
+- `.claude-plugin/plugin.json` は Claude Code 用で、`workflows` に `["./com.anthropic.claude-code/workflows/"]` を書く。
+- 両方の `name` は `agentic-doc` にそろえる。
+
+**パスの受け渡し**
+
+- スキル本文からスクリプトや参照文書を指すときは、「この SKILL.md と同じディレクトリからの相対パス」で書く。Claude Code、VS Code（Copilot）、Codex の 3 つで動くことを確認した。`${PLUGIN_ROOT}` はスキル本文では展開されないので使わない。
+- Claude Code の Workflow はファイルシステムに触れず、日付も取得できない。入口スキルが Workflow を呼ぶときに、`args.plugin_root` に `${CLAUDE_PLUGIN_ROOT}`（スキル本文で展開される）を、`args.today` に当日の日付を入れて渡す。Workflow はこれをもとに参照文書とスクリプトの絶対パスを組み立て、エージェントに渡す。
+- Workflow の `meta.name` は入口スキルと別の名前（`wiki-run`）にする。同じ名前だと、コマンドがスキルを経由せずに Workflow を直接起動し、`args` が渡らない。
+- Codex はプラグインをキャッシュ（`~/.codex/plugins/cache/...`）にコピーしてから読み込む。スクリプトはプラグイン内の相対位置だけを前提にし、プラグインのリポジトリ内の位置を前提にしない。
 
 ## 5. 設定ファイル
 
@@ -287,6 +300,12 @@ dev/testing              未検証      -          2026-10-07   保留中の指�
 
 LLM を使わず、全ハーネスで同じ結果になる処理をスクリプトにまとめる。コマンドと引数の定義（説明文を含む）は 1 か所に置き、CLI の `--help` と入口スキルの help の両方がそれを使う。
 
+**実行方式**: uv + PEP 723 の Python スクリプトとする。導入先に要求する前提は uv と git だけで、Python 本体は uv が用意する。
+
+- 入口は `skills/wiki/scripts/agentic_doc.py` の 1 本で、先頭の PEP 723 ブロックに `requires-python` と依存（YAML が必要なら PyYAML）を宣言する。呼び出しは `uv run --script <スキルのディレクトリ>/scripts/agentic_doc.py <コマンド> [引数]`。
+- 各コマンドの実装は同じ `scripts/` ディレクトリのモジュールに分け、入口から import する。
+- 導入先のリポジトリでは、カレントディレクトリを導入先のルートにして実行する。導入先の `pyproject.toml` の影響を受けない呼び出し方にする（`--script` はプロジェクトを同期しない）。
+
 | コマンド | 役割 |
 |---|---|
 | `config check` | 設定ファイルの検査（5.4） |
@@ -358,6 +377,8 @@ lint がこれらを前提に検査するため、設定では変えられない
 
 **整合テスト**: スキーマのファイル、参照文書、Workflow とスキルが参照するパスが実在することを検査する。
 
+単体テストと整合テストは pytest で書き、このリポジトリの開発用の `pyproject.toml`（パッケージは作らず、pytest と ruff を dev 依存に置くだけ）で実行する。
+
 **受入検証**
 
 | リポジトリ | 確かめること |
@@ -366,32 +387,21 @@ lint がこれらを前提に検査するため、設定では変えられない
 | agentic-doc 自身 | `setup` から `sync` まで一通り動く |
 | 小さなサンプルリポジトリ | Copilot（VS Code）と Codex CLI で縮退動作の一連の流れが動く |
 | AJpon/better-experience | 構成の異なるリポジトリで、`setup` の推定と `outline` が妥当に動く |
+| （OS） | Windows（PowerShell）と Linux で、スクリプトが macOS と同じ結果を返す。計画 1 の検証では macOS だけで確かめた |
 
 **fbx-view の移行**: `_catalogue.json` を `catalogue.json` にリネームし、設定ファイルを作る。setup の更新フロー（7.1 の 4）で扱える。
 
 ## 13. 既存資産の扱い
 
-旧 PoC の追跡済みファイルは削除する（git の履歴には残る）。対象は `tools/`、`agents/`、`skills/`（旧スキル）、`hooks/`、`outputs/`、`tests/`、`mkdocs.yml`、`docs/poctodo.md`、`docs/superpowers/context/`、`docs/superpowers/plans/2026-04-04-agentic-doc-agent-plan.md`、`pyproject.toml` と `uv.lock`（実行方式の決定後に必要なら作り直す）。
+旧 PoC の追跡済みファイルは削除する（git の履歴には残る）。対象は `tools/`、`agents/`、`skills/`（旧スキル）、`hooks/`、`outputs/`、`tests/`、`mkdocs.yml`、`docs/poctodo.md`、`docs/superpowers/context/`、`docs/superpowers/plans/2026-04-04-agentic-doc-agent-plan.md`、`pyproject.toml`、`uv.lock`、`.python-version`。開発用の `pyproject.toml` は 12 章の形で作り直す。
 
 引き継ぐものはプラグイン名 `agentic-doc` とリポジトリ。`.claude-plugin/` の 2 ファイルは書き直す。`README.md`、`.github/copilot-instructions.md`、`.github/instructions/doc-spec.instructions.md`、`AGENTS.md` は新しい構成に合わせて書き直す。`.editorconfig` と `.config/cspell*` はこのリポジトリの開発用として残す。
 
 未追跡の `.agents/`、`.opencode/`、`docs/codebase/` はリポジトリ所有者の判断に任せ、この作業では触らない。
 
-## 14. 未決事項
+## 14. 将来の拡張
 
-実装計画の最初のタスクで調査し、結論に応じてこの仕様書を更新してから実装に入る。
-
-1. **スクリプトの実行方式**: 候補は次の 3 つ。比較の観点は、導入先に要求する前提（ランタイム）、Windows / macOS / Linux での動作、YAML など外部ライブラリの使いやすさ、Agent Plugins 1.0 での配布のしやすさ、Mermaid の構文検査との相性。
-   - uv + PEP 723（スクリプトに依存をインラインで宣言する）
-   - uv で用意した Python 環境から、PyPI の `deno` パッケージ（https://pypi.org/project/deno/）経由で Deno を使う方式。スクリプトは Deno で実行し、導入先に Deno を別途入れなくて済む
-   - TypeScript の MCP サーバー（Node.js）とスキルの組み合わせ。この場合、8 章のコマンドが MCP のツールになり、help が MCP の prompt になる。
-2. **Workflow からスキルのパスを得る方法**: Workflow のスクリプトがプラグインのインストール先パスを取得できるか。
-3. **Workflow の配置**: `com.anthropic.claude-code/workflows/` を `.claude-plugin/plugin.json` の `workflows` で指して読み込めるか。
-4. **Agent Plugins 1.0 の読み込み**: Copilot（VS Code）と Codex が、ルートの `plugin.json` から `skills/` を期待どおりに読み込むか。
-
-## 15. 将来の拡張
-
-- 設定ファイル探索の拡張: cspell と同じ組み立て規則 `[.config/][.]agentic-doc[.config].{json,yaml,yml}` で受け入れる。候補が複数見つかったら列挙してエラーにする。同時に `root` キーを公開する（`root` 自体は設定ファイル基準で解決する）。YAML 対応は実行方式の決定後に判断する。
+- 設定ファイル探索の拡張: cspell と同じ組み立て規則 `[.config/][.]agentic-doc[.config].{json,yaml,yml}` で受け入れる。候補が複数見つかったら列挙してエラーにする。同時に `root` キーを公開する（`root` 自体は設定ファイル基準で解決する）。YAML の設定ファイルは PyYAML で読めるので、探索の拡張と同時に対応する。
 - モノレポ対応（1 リポジトリに複数の Wiki）
 - `instructions` の適用範囲の指定（各要素に任意の `phases` を足す）
 - `pin`: 人が手で書いたページを sync の自動更新から外す機能。名前を空けておく
