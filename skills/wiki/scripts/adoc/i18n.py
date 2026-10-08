@@ -25,6 +25,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "next_none": "nothing to do",
         "verbose_sources": "sources",
         "related_heading": "## Related pages",
+        "toc_default_title": "Wiki",
+        "toc_audience_heading": "## Start here by reader",
+        "toc_contents_heading": "## Contents",
+        "toc_col_page": "Page",
+        "toc_col_summary": "Summary",
+        "toc_not_written": "(not yet written)",
     },
     "ja": {
         "state_missing": "未生成",
@@ -50,6 +56,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "next_none": "対応不要",
         "verbose_sources": "sources",
         "related_heading": "## 関連ページ",
+        "toc_default_title": "Wiki",
+        "toc_audience_heading": "## 読者別の入口",
+        "toc_contents_heading": "## 目次",
+        "toc_col_page": "ページ",
+        "toc_col_summary": "概要",
+        "toc_not_written": "（未生成）",
     },
 }
 

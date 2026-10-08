@@ -154,3 +154,39 @@ def wiki(repo) -> Repo:
     ])
     repo.commit()
     return repo
+
+
+def read_page(r: Repo, page_id: str) -> tuple[dict, str]:
+    """ページ本文を (フロントマター, 本体) で返す."""
+    import yaml
+
+    p = page(r, page_id)
+    text = (r.root / "docs/wiki" / p["path"]).read_text(encoding="utf-8")
+    _, fm, body = text.split("---\n", 2)
+    return yaml.safe_load(fm), body
+
+
+@pytest.fixture
+def wiki2(repo) -> Repo:
+    """2 章 3 ページ（b/three は未生成）の Wiki."""
+    repo.write("src/a.py", "a\n")
+    base = repo.commit()
+    repo.write("docs/wiki/a/one.md", '---\ntitle: "Old"\ndescription: "Describes the first page."\n'
+               'audience: [agent]\nupdated: 2026-01-01\n---\n\n# One\n\nBody.\n\n## Related pages\n\n- stale\n')
+    repo.write("docs/wiki/b/two.md", '---\ntitle: "Two"\ndescription: "Describes the second page."\n'
+               'audience: [agent]\nupdated: 2026-01-01\n---\n\n# Two\n\nBody.\n')
+    repo.config()
+    repo.catalogue(
+        [
+            {"id": "a/one", "title": "One", "audience": ["contributor"], "brief": "First page. More text.",
+             "sources": ["src/a.py"], "related": ["b/two"], "source_commit": base},
+            {"id": "b/two", "title": "Two", "audience": ["agent"], "brief": "二つ目。続き。",
+             "sources": ["src/a.py"], "source_commit": base},
+            {"id": "b/three", "title": "Three", "audience": ["contributor", "agent"], "brief": "Third | page",
+             "sources": ["src/a.py"]},
+        ],
+        chapters=[{"id": "a", "title": "Chapter A", "description": "About A."},
+                  {"id": "b", "title": "Chapter B", "description": "About B."}],
+    )
+    repo.commit()
+    return repo
