@@ -80,3 +80,43 @@ def run_cli(cwd: Path, *args: str, input: str | None = None) -> tuple[int, str, 
         input=input, text=True, encoding="utf-8", check=False,
     )
     return r.returncode, r.stdout, r.stderr
+
+
+def load_catalogue(r: Repo, path: str = "docs/wiki/catalogue.json") -> dict:
+    return json.loads((r.root / path).read_text(encoding="utf-8"))
+
+
+def page(r: Repo, page_id: str) -> dict:
+    """カタログ上のページを返す."""
+    return next(p for p in load_catalogue(r)["pages"] if p["id"] == page_id)
+
+
+def set_sources(r: Repo, page_id: str, globs: list[str]) -> None:
+    """カタログの該当ページの sources を書き換える."""
+    data = load_catalogue(r)
+    for p in data["pages"]:
+        if p["id"] == page_id:
+            p["sources"] = globs
+    r.write("docs/wiki/catalogue.json", dump(data))
+
+
+@pytest.fixture
+def five(repo) -> Repo:
+    """5 状態（fresh / changed / unresolved / unverified / missing）を 1 ページずつ持つリポジトリ."""
+    repo.write("src/a.py", "a")
+    repo.write("src/b.py", "b")
+    c1 = repo.commit()
+    repo.write("src/b.py", "b2")
+    c2 = repo.commit()
+    for p in ["fresh", "changed", "unresolved", "unverified"]:
+        repo.write(f"docs/wiki/g/{p}.md", "x")
+    repo.config()
+    repo.catalogue([
+        {"id": "g/fresh", "path": "g/fresh.md", "sources": ["src/a.py"], "source_commit": c2},
+        {"id": "g/changed", "path": "g/changed.md", "sources": ["src/b.py"], "source_commit": c1},
+        {"id": "g/unresolved", "path": "g/unresolved.md", "sources": ["src/a.py"], "source_commit": "0" * 40},
+        {"id": "g/unverified", "path": "g/unverified.md", "sources": ["src/a.py"], "source_commit": None},
+        {"id": "g/missing", "path": "g/missing.md", "sources": ["src/a.py"], "source_commit": c2},
+    ])
+    repo.commit()
+    return repo
