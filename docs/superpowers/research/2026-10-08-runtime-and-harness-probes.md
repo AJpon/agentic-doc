@@ -1,5 +1,13 @@
 # 実行方式とハーネスの検証記録
 
+## 結論（2026-10-09、所有者承認済み）
+
+- **実行方式**: uv + PEP 723 の Python スクリプト。導入先の前提は uv と git だけ。
+- **スキルからスクリプトを指す書き方**: 「この SKILL.md と同じディレクトリからの相対パス」。Claude Code・VS Code（Copilot）・Codex の 3 つで動いた。`${PLUGIN_ROOT}` はスキル本文では展開されないので使わない。
+- **Workflow へのパスの渡し方**: 入口スキルが `${CLAUDE_PLUGIN_ROOT}` を Workflow の `args.plugin_root` に入れて渡す。Workflow の `meta.name` は入口スキルと別の名前にする。
+- **マニフェスト**: ルートに Agent Plugins 1.0 の `plugin.json`、`.claude-plugin/plugin.json` に Claude Code 用。Workflow は `workflows` で `./com.anthropic.claude-code/workflows/` を指す。
+- **未確認**: Windows と Linux での動作、両方のマニフェストを置いたときに VS Code が読み込む名前。
+
 計画 1（`docs/superpowers/plans/2026-10-08-agentic-doc-plan1-foundation.md`）の Task 1〜3 の結果。プローブは `spikes/` に置いた使い捨てのコードで、git には入れていない。
 
 ## 1. Claude Code
@@ -89,7 +97,7 @@ Claude Code で補足的に確かめたこと:
 | 観点 | A. uv + PEP 723 | B. uv + deno | C. MCP（Node） |
 |---|---|---|---|
 | 導入先に要求する前提 | uv だけ（Python は uv が用意する） | uv だけ | Node.js と、依存のインストール（またはビルド済みの 1 ファイルを同梱） |
-| Windows / macOS / Linux | macOS で確認。Windows は未確認（所有者に依頼中） | 同左 | 同左 |
+| Windows / macOS / Linux | macOS で確認。Windows と Linux は未確認（計画 4 の受入検証で確かめる） | 同左 | 同左 |
 | 外部ライブラリ | PyPI。PEP 723 で宣言すればインストール手順が要らない | jsr と npm。URL で宣言すればインストール手順が要らない | npm。インストールかバンドルが必要 |
 | Agent Plugins 1.0 での配布 | スキル内の `scripts/` に置くだけ。スキルから相対パスで呼べる（Task 2 の結果） | 同左 | `mcp.json` は移植できる部品なので、ツールとして全ハーネスから使える。ただし依存の扱いが要る |
 | 人間が CLI として直接使う（`--help`、`status`） | そのまま使える | そのまま使える | MCP サーバーとは別に CLI の入口が必要 |
