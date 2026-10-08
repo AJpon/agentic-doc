@@ -1,0 +1,19 @@
+[project]
+name = "agentic-doc-dev"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.15", "pyyaml>=6", "jsonschema>=4.23"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["skills/wiki/scripts"]
+
+[tool.ruff]
+line-length = 120
+include = ["skills/**/*.py", "tests/**/*.py"]
