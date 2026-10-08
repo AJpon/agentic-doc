@@ -383,7 +383,7 @@ lint がこれらを前提に検査するため、設定では変えられない
 
 1. **スクリプトの実行方式**: 候補は次の 3 つ。比較の観点は、導入先に要求する前提（ランタイム）、Windows / macOS / Linux での動作、YAML など外部ライブラリの使いやすさ、Agent Plugins 1.0 での配布のしやすさ、Mermaid の構文検査との相性。
    - uv + PEP 723（スクリプトに依存をインラインで宣言する）
-   - Python を別ランタイムで動かす方式（例: Deno 上の Python など）
+   - uv で用意した Python 環境から、PyPI の `deno` パッケージ（https://pypi.org/project/deno/）経由で Deno を使う方式。スクリプトは Deno で実行し、導入先に Deno を別途入れなくて済む
    - TypeScript の MCP サーバー（Node.js）とスキルの組み合わせ。この場合、8 章のコマンドが MCP のツールになり、help が MCP の prompt になる。
 2. **Workflow からスキルのパスを得る方法**: Workflow のスクリプトがプラグインのインストール先パスを取得できるか。
 3. **Workflow の配置**: `com.anthropic.claude-code/workflows/` を `.claude-plugin/plugin.json` の `workflows` で指して読み込めるか。
