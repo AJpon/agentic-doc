@@ -323,11 +323,11 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | `status` | ページの状態の表示（7.4）。`--json` は他のコマンドの入力になる |
 | `plan` | sync の対象、HEAD、日付、警告を JSON で出す。判定は `status` と共通 |
 | `lint` | 機械的な検査（7.5 の 1）。`--citations <id>` で、ページ内の全引用と引用先の実際の行を並べて出す（引用レンズが使う） |
-| `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する |
+| `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する。本文ファイルが無いページ、HEAD の祖先でないコミット、正規の書式でないカタログは拒否する |
 | `stamp` | 7.6 |
 | `findings` | 未解決の指摘（10.2）を保存・表示・削除する。`findings save <id> <file>`（`-` で標準入力）、`findings show <id>`（本文のハッシュが一致しなければ破棄して `null`）、`findings clear <id>`。Workflow はファイルを書けないため、エージェントがこのコマンドで保存する |
 | `toc` | カタログから目次（`<wiki_dir>/README.md`）を生成し、`related` の相互リンクを双方向にし、各ページのフロントマターの `title` / `audience` / `updated` をカタログに揃える |
-| `post` | `post_commands` を実行する |
+| `post` | `post_commands` を実行する。ファイルの指定が無ければ何も実行しない。`{files}` を他の文字と連結した引数があれば、どのコマンドも実行せずに拒否する |
 
 終了コードは全コマンド共通で、0 = 問題なし、1 = 指摘あり（lint の指摘、stamp でスキップしたページなど）、2 = 拒否・入力エラー。
 
