@@ -40,11 +40,16 @@ def load(cfg: Config) -> dict:
     return data
 
 
-def save(cfg: Config, data: dict) -> None:
-    """カタログを書く。ディスク上の元テキストが正規の書式でなければ Refused."""
+def ensure_canonical(cfg: Config) -> None:
+    """ディスク上のカタログが正規の書式でなければ Refused."""
     original = cfg.catalogue.read_text(encoding="utf-8")
     if dump(json.loads(original)) != original:
         raise Refused("catalogue is not in canonical format (2-space JSON); refusing to rewrite")
+
+
+def save(cfg: Config, data: dict) -> None:
+    """カタログを書く。ディスク上の元テキストが正規の書式でなければ Refused."""
+    ensure_canonical(cfg)
     cfg.catalogue.write_bytes(dump(data).encode("utf-8"))
 
 

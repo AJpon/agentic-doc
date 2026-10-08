@@ -120,3 +120,10 @@ def five(repo) -> Repo:
     ])
     repo.commit()
     return repo
+
+
+def diff_lines(a: str, b: str) -> int:
+    """a と b で異なる行の数（置き換えは 1 行と数える）."""
+    import difflib
+
+    return sum(1 for line in difflib.ndiff(a.splitlines(), b.splitlines()) if line.startswith("+ "))
