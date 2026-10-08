@@ -127,3 +127,30 @@ def diff_lines(a: str, b: str) -> int:
     import difflib
 
     return sum(1 for line in difflib.ndiff(a.splitlines(), b.splitlines()) if line.startswith("+ "))
+
+
+def issue_codes(r: Repo, *args: str) -> set[str]:
+    """lint --json の issues の code の集合."""
+    code, out, err = run_cli(r.root, "lint", "--json", *args)
+    assert code in (0, 1), err
+    return {i["code"] for i in json.loads(out)["issues"]}
+
+
+@pytest.fixture
+def wiki(repo) -> Repo:
+    """6 ファイルのソースと、規約どおりの正常なページ 2 枚を持つリポジトリ."""
+    from lint_fixtures import clean_page
+
+    repo.write("src/a.py", "1\n2\n3\n")
+    for n in "bcdef":
+        repo.write(f"src/{n}.py", "x\n")
+    base = repo.commit()
+    repo.write("docs/wiki/g/page.md", clean_page("Page", "Other", "other.md"))
+    repo.write("docs/wiki/g/other.md", clean_page("Other", "Page", "page.md"))
+    repo.config()
+    repo.catalogue([
+        {"id": "g/page", "title": "Page", "sources": ["src/*.py"], "related": ["g/other"], "source_commit": base},
+        {"id": "g/other", "title": "Other", "sources": ["src/*.py"], "related": ["g/page"], "source_commit": base},
+    ])
+    repo.commit()
+    return repo

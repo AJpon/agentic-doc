@@ -24,6 +24,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "next_commit": "commit the changes in sources first",
         "next_none": "nothing to do",
         "verbose_sources": "sources",
+        "related_heading": "## Related pages",
     },
     "ja": {
         "state_missing": "未生成",
@@ -48,6 +49,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "next_commit": "sources の変更を先にコミットする",
         "next_none": "対応不要",
         "verbose_sources": "sources",
+        "related_heading": "## 関連ページ",
     },
 }
 
