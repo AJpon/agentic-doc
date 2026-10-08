@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "agentic-doc",
+  "version": "0.1.0",
+  "description": "コードベースから Markdown Wiki を生成し、コードの変化に追随させ続ける",
+  "author": {
+    "name": "pon",
+    "email": "pon@ajpon.com"
+  },
+  "homepage": "https://github.com/AJpon/agentic-doc",
+  "repository": "https://github.com/AJpon/agentic-doc",
+  "keywords": ["skills", "workflows", "documentation", "wiki"]
+}

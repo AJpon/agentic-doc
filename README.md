@@ -1,26 +1,12 @@
+# agentic-doc
 
-# DocAgent PoC
+コードベースから Markdown の Wiki を生成し、コードの変化に追随させ続けるためのエージェントプラグインです。各ページが依存するファイルとコミットを記録し、git の差分で古くなったページを見つけて書き直します。Claude Code、GitHub Copilot（VS Code）、Codex CLI での利用を想定しています。
 
-ローカルで動く「コードベース解析 → インデックス化 → Wiki（Markdown）生成」のPoC雛形です。
+## 状態
 
-クイックスタート:（ローカル環境での検証手順）
+開発中です。まだ利用できる機能はありません。
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+## 設計
 
-# 1) リポジトリを解析して抽出
-python -m tools.docagent.cli ingest --repo /path/to/target/repo --out tools/docagent/data/extracted.jsonl
-
-# 2) 抽出結果をインデックス化（埋め込みが利用可能なら埋め込みを作成）
-python -m tools.docagent.cli index --input tools/docagent/data/extracted.jsonl --persist tools/docagent/data
-
-# 3) インデックスからMarkdownを生成して docs/wiki/ に出力
-python -m tools.docagent.cli generate --out docs/wiki
-
-# 4) プレビュー
-mkdocs serve
-```
-
-目的: ローカルでのドキュメント作成負荷を下げるため、まずはローカルエージェントでコードを体系的に理解してMarkdown Wikiを生成できることを目指す。
+- [設計仕様](docs/superpowers/specs/2026-10-08-agentic-doc-wiki-plugin-design.md)
+- [実行方式とハーネスの検証記録](docs/superpowers/research/2026-10-08-runtime-and-harness-probes.md)

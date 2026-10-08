@@ -1,7 +1,0 @@
-{
-  "_generated_by": "これはサブエージェントが生成しました",
-  "name": "validation-hook",
-  "trigger": "before:commit",
-  "description": "生成ドキュメントの簡易検証を行うフック",
-  "command": "python -m pytest -q tools/docagent/tests || true"
-}

@@ -1,7 +1,0 @@
-{
-  "_generated_by": "これはサブエージェントが生成しました",
-  "name": "post-generate-diff",
-  "trigger": "after:generate",
-  "description": "ドキュメント生成後に差分を作成するフック",
-  "command": "python -m tools.docagent.generate && git --no-pager diff -- tools/docagent/data || true"
-}
