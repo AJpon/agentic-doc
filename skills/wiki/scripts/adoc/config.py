@@ -96,6 +96,10 @@ def check(root: Path) -> list[dict]:
     for i, cmd in enumerate(cfg.post_commands):
         if "{files}" not in cmd:
             issues.append(_issue("error", "post-no-files", f"/post_commands/{i}: {cmd}"))
+        if "\\" in cmd:
+            issues.append(_issue("warning", "post-backslash",
+                                 f"/post_commands/{i}: use forward slashes in paths (commands are split with POSIX "
+                                 f"shlex rules, also on Windows): {cmd}"))
     ids = [a["id"] for a in cfg.audiences]
     for dup in sorted({i for i in ids if ids.count(i) > 1}):
         issues.append(_issue("error", "audience-duplicate", f"audiences id: {dup}"))
