@@ -6,7 +6,13 @@
 - **スキルからスクリプトを指す書き方**: 「この SKILL.md と同じディレクトリからの相対パス」。Claude Code・VS Code（Copilot）・Codex の 3 つで動いた。`${PLUGIN_ROOT}` はスキル本文では展開されないので使わない。
 - **Workflow へのパスの渡し方**: 入口スキルが `${CLAUDE_PLUGIN_ROOT}` を Workflow の `args.plugin_root` に入れて渡す。Workflow の `meta.name` は入口スキルと別の名前にする。
 - **マニフェスト**: ルートに Agent Plugins 1.0 の `plugin.json`、`.claude-plugin/plugin.json` に Claude Code 用。Workflow は `workflows` で `./com.anthropic.claude-code/workflows/` を指す。
-- **未確認**: Windows と Linux での動作、両方のマニフェストを置いたときに VS Code が読み込む名前。
+- **未確認**（計画 2〜4 で確かめる。検証済みと扱わないこと）:
+  - Windows と Linux での動作
+  - 両方のマニフェストを置いたときに VS Code が読み込む名前
+  - Python 本体が未導入の環境での初回実行（3.2 節の計測は uv 管理の Python が導入済みの状態で行った）
+  - リポジトリ内のファイル名が非 ASCII の場合（3.2 節で確かめたのは、リポジトリとスクリプトの置き場所のパスだけ）
+  - Claude Code で git や URL のマーケットプレイスからインストールし、キャッシュに置かれた場合
+  - Codex で両方のマニフェストを置いた場合と、本番と同じ `source: "./"`（マーケットプレイスとプラグインが同じルート）の構成
 
 計画 1（`docs/superpowers/plans/2026-10-08-agentic-doc-plan1-foundation.md`）の Task 1〜3 の結果。プローブは `spikes/` に置いた使い捨てのコードで、git には入れていない。
 
@@ -82,12 +88,12 @@ Claude Code で補足的に確かめたこと:
 
 | 項目 | A. uv + PEP 723 | B. uv + deno | C. MCP（Node） |
 |---|---|---|---|
-| 初回（キャッシュ空） | 4.4 秒 | 20.2 秒 | 依存のインストール 22.8 秒 ＋ 起動と呼び出し 2.3 秒 |
+| 初回（uv・deno・npm のキャッシュ空。uv 管理の Python は導入済み） | 4.4 秒 | 20.2 秒 | 依存のインストール 22.8 秒 ＋ 起動と呼び出し 2.3 秒 |
 | 2 回目以降（3 回） | 1.2 / 0.9 / 1.2 秒 | 3.1 / 1.7 / 1.0 秒 | 2.3 / 1.8 / 1.7 秒（起動込み。常駐後の呼び出しはこれより短い） |
 | 初回にダウンロードされる量 | 1.8 MB（PyYAML） | 162 MB（deno の wheel）＋ 2.1 MB（jsr のモジュール） | 27 MB（node_modules） |
 | git リポジトリ外で実行 | 終了コード 2、「not a git repository: <パス>」 | 同左 | ツールがエラーを返す（直接呼び出しでは終了コード 2） |
 | git が PATH に無い | 終了コード 2、「git not found on PATH」 | 同等の処理を実装 | 同等の処理を実装 |
-| 空白と非 ASCII を含むパス（`spikes/パス に 空白/`） | 一致 | 一致 | 一致 |
+| 空白と非 ASCII を含むパス（リポジトリとスクリプトの置き場所 `spikes/パス に 空白/`。リポジトリ内のファイル名は ASCII のみ） | 一致 | 一致 | 一致 |
 | オフラインかつキャッシュ空 | 失敗。「network was disabled」と原因の分かるヒントが出る | uv の段階で同じヒント。deno のキャッシュだけ空なら「Specifier not found in cache」 | `npm ci --offline` が失敗。メッセージはログを見ないと分かりにくい |
 
 計測時間は数回のばらつきが大きく、1 秒前後の差には意味がない。初回の差とダウンロード量の差ははっきりしている。
