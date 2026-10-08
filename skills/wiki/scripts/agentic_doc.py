@@ -12,25 +12,17 @@
 
 import argparse
 import sys
-from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from adoc import cmd_config
+from adoc.cli import Command
 from adoc.errors import Refused
 
-
-@dataclass(frozen=True)
-class Command:
-    """サブコマンドの定義。help は 1 行の説明."""
-
-    help: str
-    add_args: Callable[[argparse.ArgumentParser], None]
-    run: Callable[[argparse.Namespace], int]
-
-
-COMMANDS: dict[str, Command] = {}
+COMMANDS: dict[str, Command] = {
+    "config": cmd_config.COMMAND,
+}
 
 
 class _Parser(argparse.ArgumentParser):

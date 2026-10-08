@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-doc/schemas/config.schema.json",
+  "title": "agentic-doc config (.agentic-doc.config.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "wiki_dir": { "type": "string", "minLength": 1 },
+    "catalogue": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 1 },
+    "audiences": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "description", "no_code"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "no_code": { "type": "boolean" }
+        }
+      }
+    },
+    "exclude": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "context": { "$ref": "#/$defs/textOrFileList" },
+    "instructions": { "$ref": "#/$defs/textOrFileList" },
+    "post_commands": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "max_pages": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "textOrFileList": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": { "text": { "type": "string" } }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file"],
+            "properties": { "file": { "type": "string", "minLength": 1 } }
+          }
+        ]
+      }
+    }
+  }
+}
