@@ -1,18 +1,13 @@
 {
-    "name": "agentic-doc",
-    "description": "Agentic documentation and wiki system for organizing skills, workflows, and best practices",
-    "version": "0.1.0",
-    "author": {
-        "name": "pon",
-        "email": "pon@ajpon.com"
-    },
-    "homepage": "https://github.com/AJpon/agentic-doc",
-    "repository": "https://github.com/AJpon/agentic-doc",
-    "license": "",
-    "keywords": [
-        "skills",
-        "workflows",
-        "documentation",
-        "wiki"
-    ]
+  "name": "agentic-doc",
+  "version": "0.1.0",
+  "description": "コードベースから Markdown Wiki を生成し、コードの変化に追随させ続ける",
+  "author": {
+    "name": "pon",
+    "email": "pon@ajpon.com"
+  },
+  "homepage": "https://github.com/AJpon/agentic-doc",
+  "repository": "https://github.com/AJpon/agentic-doc",
+  "keywords": ["skills", "workflows", "documentation", "wiki"],
+  "workflows": ["./com.anthropic.claude-code/workflows/"]
 }

@@ -1,7 +1,0 @@
-{
-  "_generated_by": "これはサブエージェントが生成しました",
-  "name": "snippet-test-hook",
-  "trigger": "on:push",
-  "description": "コードスニペットの簡易実行テスト（PoC）",
-  "command": "python -c \"print('snippet test')\" || true"
-}

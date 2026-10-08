@@ -1,5 +1,0 @@
-{
-  "approved": false,
-  "preview": "*** Begin Patch Sample\n*** Update File: docs/wiki/index.md\n@@\n- [cli.py](cli.py.md)\n- [cs_extractor.py](cs_extractor.py.md)\n- [py_extractor.py](py_extractor.py.md)\n- [ts_extractor.py](ts_extractor.py.md)\n- [generate.py](generate.py.md)\n- [index.py](index.py.md)\n- [ingest.py](ingest.py.md)\n- [new_page.md](new_page.md)\n*** End Patch Sample",
-  "patch_path": "outputs/diffs/sample.patch"
-}
