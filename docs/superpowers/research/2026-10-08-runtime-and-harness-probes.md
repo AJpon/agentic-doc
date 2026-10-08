@@ -29,3 +29,66 @@ $ claude -p "/agentic-doc-probe:run-probe" --allowedTools "Workflow,Read,Skill"
 - **スキルと Workflow の名前の衝突**: スキルと Workflow がどちらも `probe` という名前だと、`/agentic-doc-probe:probe` は Workflow を直接起動した。スキルは経由しないので `args` が渡らず、`plugin_root` は `undefined` になった。本番では、入口スキル `wiki` と Workflow の `meta.name` を別の名前にする必要がある（例: Workflow は `wiki-run`）。
 - **`claude -p` の引数の順序**: `--allowedTools` は値を複数取るので、プロンプトはその前に書く必要がある。
 - **ローカルパスのマーケットプレイス**: ローカルパスから追加したマーケットプレイスでは、プラグインはキャッシュにコピーされずにその場で読み込まれる（`plugin_root` が `spikes/cc-plugin` のまま）。git や URL のマーケットプレイスからインストールした場合のキャッシュ先パスでは試していない。`${CLAUDE_PLUGIN_ROOT}` はどちらでも展開される仕組みなので同じく動くと見込むが、未確認。
+
+## 2. Agent Plugins 1.0
+
+（VS Code と Codex CLI の確認結果を待って追記する。Claude Code 側で確認できたことだけを先に記す）
+
+- ルートに Agent Plugins 1.0 の `plugin.json`（`$schema` 付き）だけを置いたプラグインは、`claude plugin validate` を通る。
+- ルートの `plugin.json` と `.claude-plugin/plugin.json` の両方を置いた場合、Claude Code は `.claude-plugin/plugin.json` の名前（`agentic-doc-probe-cc`）で読み込む。validate の警告は `author` が無いことだけ。
+- Claude Code では、スキル本文の `${PLUGIN_ROOT}` は展開されずに文字列のまま残る。一方、スキルのベースディレクトリはエージェントに渡されるので、「この SKILL.md と同じディレクトリの `scripts/hello.py`」という書き方で絶対パスに解決して実行できた。
+- VS Code のドキュメントでは、プラグインの形式は `plugin.json`（Agent Plugins 1.0 の `$schema` 付き）→ `.claude-plugin/plugin.json` → `.plugin/plugin.json` → `plugin.json`（スキーマなし）の順に判定され、プラグインのルートを指すトークンは Agent Plugins 1.0 形式なら `${PLUGIN_ROOT}`、Claude 形式なら `${CLAUDE_PLUGIN_ROOT}` とされている（記載はフックのコマンドについて）。ローカルのプラグインは設定 `chat.pluginLocations` で読み込む。
+
+## 3. 実行方式
+
+### 3.1 プローブ
+
+3 方式で同じ処理を書いた。仕様書 7.4 の `status` を縮めたもので、5 状態（missing / unverified / unresolved / changed / fresh）の判定、`.agentic-doc.config.json` と `catalogue.json` の読み込み、YAML の読み込み、git の呼び出しを含む。フィクスチャのリポジトリは 5 状態が 1 ページずつ出るように作った。
+
+| 方式 | プローブ | 起動コマンド | YAML |
+|---|---|---|---|
+| A. uv + PEP 723 | `spikes/runtime/uv-pep723/probe.py` | `uv run --script probe.py` | PyYAML（PEP 723 で宣言） |
+| B. uv + PyPI の deno | `spikes/runtime/uv-deno/probe.ts` | `uv run --no-project --with deno deno run --allow-read --allow-run=git probe.ts` | `jsr:@std/yaml@1` |
+| C. Node.js の MCP サーバー | `spikes/runtime/mcp-node/server.ts` | MCP クライアントから stdio で起動（Node 24 は `.ts` をそのまま実行） | npm の `yaml` |
+
+3 方式とも期待値と完全に一致した。C は `claude -p --mcp-config` 経由と、LLM を介さない直接の JSON-RPC 呼び出しの両方で一致した。
+
+### 3.2 計測（macOS arm64、Apple Git 2.50）
+
+| 項目 | A. uv + PEP 723 | B. uv + deno | C. MCP（Node） |
+|---|---|---|---|
+| 初回（キャッシュ空） | 4.4 秒 | 20.2 秒 | 依存のインストール 22.8 秒 ＋ 起動と呼び出し 2.3 秒 |
+| 2 回目以降（3 回） | 1.2 / 0.9 / 1.2 秒 | 3.1 / 1.7 / 1.0 秒 | 2.3 / 1.8 / 1.7 秒（起動込み。常駐後の呼び出しはこれより短い） |
+| 初回にダウンロードされる量 | 1.8 MB（PyYAML） | 162 MB（deno の wheel）＋ 2.1 MB（jsr のモジュール） | 27 MB（node_modules） |
+| git リポジトリ外で実行 | 終了コード 2、「not a git repository: <パス>」 | 同左 | ツールがエラーを返す（直接呼び出しでは終了コード 2） |
+| git が PATH に無い | 終了コード 2、「git not found on PATH」 | 同等の処理を実装 | 同等の処理を実装 |
+| 空白と非 ASCII を含むパス（`spikes/パス に 空白/`） | 一致 | 一致 | 一致 |
+| オフラインかつキャッシュ空 | 失敗。「network was disabled」と原因の分かるヒントが出る | uv の段階で同じヒント。deno のキャッシュだけ空なら「Specifier not found in cache」 | `npm ci --offline` が失敗。メッセージはログを見ないと分かりにくい |
+
+計測時間は数回のばらつきが大きく、1 秒前後の差には意味がない。初回の差とダウンロード量の差ははっきりしている。
+
+### 3.3 比較
+
+| 観点 | A. uv + PEP 723 | B. uv + deno | C. MCP（Node） |
+|---|---|---|---|
+| 導入先に要求する前提 | uv だけ（Python は uv が用意する） | uv だけ | Node.js と、依存のインストール（またはビルド済みの 1 ファイルを同梱） |
+| Windows / macOS / Linux | macOS で確認。Windows は未確認（所有者に依頼中） | 同左 | 同左 |
+| 外部ライブラリ | PyPI。PEP 723 で宣言すればインストール手順が要らない | jsr と npm。URL で宣言すればインストール手順が要らない | npm。インストールかバンドルが必要 |
+| Agent Plugins 1.0 での配布 | スキル内の `scripts/` に置くだけ。スキルから相対パスで呼べる（Task 2 の結果） | 同左 | `mcp.json` は移植できる部品なので、ツールとして全ハーネスから使える。ただし依存の扱いが要る |
+| 人間が CLI として直接使う（`--help`、`status`） | そのまま使える | そのまま使える | MCP サーバーとは別に CLI の入口が必要 |
+| Workflow のエージェントから使う | Bash で呼ぶ | Bash で呼ぶ | MCP のツールとして呼ぶ（Bash の権限が不要） |
+| Mermaid の構文検査 | Node と mermaid が別途必要（任意の検査として扱う） | `npm:mermaid` を Deno で動かせる可能性がある（未確認） | 同じ Node で mermaid を使える |
+| 元実装からの移植 | `wiki_lint.py` と `wiki_repin.py` をそのまま流用できる | TypeScript への書き直しが必要 | 同左 |
+| 初回の速さとダウンロード量 | 最も速く、最も小さい | 最も遅く、最も大きい（deno 本体） | 中間 |
+
+### 3.4 推奨
+
+**A. uv + PEP 723 を推奨する。**
+
+- 前提が uv だけで済み、初回の待ち時間とダウンロード量が 3 方式で最も小さい。
+- 元実装の `wiki_lint.py` と `wiki_repin.py` を流用でき、移植の手間とリスクが最も小さい。
+- スキル内の `scripts/` に置けば、Claude Code では相対パスで呼び出せることを確認済み（Copilot と Codex は Task 2 で確認）。人間がそのまま CLI として使える。
+- C の利点（`mcp.json` での移植性、Bash の権限が要らないこと）は、A のスクリプトを薄い MCP サーバーで包めば後から得られる。逆に C を先に選ぶと、人間向けの CLI を別に作る必要がある。
+- B は TypeScript で書ける点を除き、A に対する利点が見当たらない。deno 本体の 162 MB のダウンロードが初回の体験を損なう。
+
+Mermaid の構文検査は、Node と mermaid がある環境でだけ動く任意の検査とする（仕様書 8 章のとおり）。
