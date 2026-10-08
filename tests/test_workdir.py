@@ -70,3 +70,21 @@ def test_findings_errors(five):
     assert run_cli(five.root, "findings", "save", "g/changed", "-", input="{}")[0] == 2
     assert run_cli(five.root, "findings", "save", "g/changed", "-", input="not json")[0] == 2
     assert run_cli(five.root, "findings", "save", "g/missing", "-", input="[]")[0] == 2
+
+
+def test_findings_save_reads_stdin_as_utf8(five):
+    import os
+    import subprocess
+    import sys
+
+    from conftest import SCRIPT
+
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    r = subprocess.run([sys.executable, str(SCRIPT), "findings", "save", "g/changed", "-"], cwd=five.root,
+                       input='[{"detail": "日本語"}]'.encode(), capture_output=True, env=env, check=False)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    assert json.loads(run_cli(five.root, "findings", "show", "g/changed")[1]) == [{"detail": "日本語"}]
+
+
+def test_findings_save_missing_file_exits_2(five):
+    assert run_cli(five.root, "findings", "save", "g/changed", "nope.json")[0] == 2

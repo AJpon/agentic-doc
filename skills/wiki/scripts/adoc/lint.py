@@ -69,8 +69,30 @@ def extract_citations(body: str, tracked: set[str]) -> list[dict]:
 
 
 def split_frontmatter(text: str) -> tuple[str | None, str]:
+    """(フロントマター, 本体)。先頭の BOM は除く。フロントマターが無ければ (None, text)."""
+    text = text.removeprefix("\ufeff")
     m = FRONTMATTER.match(text)
     return (m.group(1), text[m.end():]) if m else (None, text)
+
+
+_FENCE = re.compile(r"^[ \t]*(```|~~~)")
+
+
+def find_heading(body: str, heading: str) -> tuple[int, int] | None:
+    """コードフェンスの外で heading と一致する行の (開始, 終了) を返す。節の終わりは次の `## ` の手前か末尾."""
+    pos, fence, start = 0, None, None
+    for line in body.splitlines(keepends=True):
+        stripped = line.rstrip("\r\n")
+        m = _FENCE.match(stripped)
+        if m:
+            fence = None if fence == m.group(1) else (fence or m.group(1))
+        elif fence is None:
+            if start is None and stripped.rstrip(" \t") == heading:
+                start = pos
+            elif start is not None and stripped.startswith("## "):
+                return start, pos
+        pos += len(line)
+    return (start, len(body)) if start is not None else None
 
 
 def resolve(ref: str, tracked: set[str]) -> tuple[str | None, bool]:
@@ -84,7 +106,10 @@ def resolve(ref: str, tracked: set[str]) -> tuple[str | None, bool]:
 
 
 def _lines(cfg: Config, rel: str) -> list[str]:
-    return (cfg.root / rel).read_text(encoding="utf-8", errors="ignore").splitlines()
+    """改行（LF）だけで区切った行。\f などでは区切らない."""
+    text = (cfg.root / rel).read_bytes().decode("utf-8", errors="replace")
+    lines = [ln.removesuffix("\r") for ln in text.split("\n")]
+    return lines[:-1] if lines and lines[-1] == "" else lines
 
 
 def is_no_code(cfg: Config, page: dict) -> bool:
@@ -156,6 +181,9 @@ def _check_citations(cfg: Config, ctx: _Ctx, body: str, add) -> set[str]:
         if real is None:
             add("blocker", "cite-missing", f"{label} — not a tracked file, or the short name is ambiguous")
             continue
+        if not (cfg.root / real).is_file():
+            add("blocker", "cite-missing", f"{label} — the file is deleted in the working tree")
+            continue
         if short:
             add("minor", "cite-shortpath", f"{label} — write the full path {real}")
         if real not in ctx.included:
@@ -196,7 +224,7 @@ def lint_page(cfg: Config, page: dict, all_pages: list[dict], tracked: set[str] 
     if any(FORBIDDEN_MERMAID.search(d) for d in diagrams):
         add("major", "mermaid-style", "uses style/classDef/fill:/stroke:/<br/>")
     heading = t(cfg.language, "related_heading")
-    if page["related"] and not re.search(r"^" + re.escape(heading) + r"[ \t]*$", body, re.MULTILINE):
+    if page["related"] and find_heading(body, heading) is None:
         add("major", "related", f"related is set but the page has no `{heading}` section")
     if GITHUB_BLOB.search(body):
         add("major", "github-url", "cites with a GitHub blob URL")
@@ -262,7 +290,7 @@ def show_citations(cfg: Config, page: dict) -> None:
             print(f"--- :{spec} — shorthand without a preceding full path")
             continue
         real, _ = resolve(c["ref"], tracked)
-        if real is None:
+        if real is None or not (cfg.root / real).is_file():
             print(f"--- {c['ref']}:{spec} — not a tracked file")
             continue
         lines = _lines(cfg, real)

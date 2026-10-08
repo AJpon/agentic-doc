@@ -79,3 +79,36 @@ def test_toc_dry_run_writes_nothing(wiki2):
     assert "docs/wiki/README.md" in out
     assert not (wiki2.root / "docs/wiki/README.md").exists()
     assert wiki2.git("status", "--porcelain") == ""
+
+
+def test_heading_inside_code_fence_is_not_the_related_section(wiki2):
+    p = wiki2.root / "docs/wiki/a/one.md"
+    text = p.read_text().replace("## Related pages\n\n- stale\n", "")
+    text += "\n```markdown\n## Related pages\nexample\n```\n\nTail paragraph.\n"
+    p.write_text(text)
+    run_cli(wiki2.root, "toc")
+    body = p.read_text()
+    assert "```markdown\n## Related pages\nexample\n```\n\nTail paragraph." in body
+    assert body.rstrip().endswith("- [Two](../b/two.md)")
+
+
+def test_bom_frontmatter_is_not_duplicated(wiki2):
+    p = wiki2.root / "docs/wiki/a/one.md"
+    p.write_bytes(b"\xef\xbb\xbf" + p.read_bytes())
+    run_cli(wiki2.root, "toc")
+    text = p.read_text(encoding="utf-8")
+    assert text.count("description:") == 1 and "Describes the first page." in text
+
+
+def test_unparsable_frontmatter_refused(wiki2):
+    p = wiki2.root / "docs/wiki/a/one.md"
+    p.write_text('---\ntitle: "unclosed\n---\n\nBody.\n')
+    before = p.read_text()
+    assert run_cli(wiki2.root, "toc")[0] == 2
+    assert p.read_text() == before
+
+
+def test_toc_region_language_tag(wiki2):
+    wiki2.config(language="ja-JP")
+    run_cli(wiki2.root, "toc")
+    assert "（未生成）" in readme(wiki2)

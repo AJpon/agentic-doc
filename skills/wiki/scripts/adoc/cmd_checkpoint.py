@@ -15,9 +15,13 @@ def add_args(p: argparse.ArgumentParser) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    root = Path.cwd()
-    gitutil.ensure_repo(root)
-    cfg = config.load(root)
+    cfg = config.load(Path.cwd())
+    with catalogue.locked(cfg):
+        return _run(args, cfg)
+
+
+def _run(args: argparse.Namespace, cfg: config.Config) -> int:
+    gitutil.ensure_repo(cfg.root)
     data = catalogue.load(cfg)
     catalogue.ensure_canonical(cfg)
     pages = catalogue.select(data, args.pages)

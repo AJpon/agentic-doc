@@ -10,8 +10,9 @@ import yaml
 from adoc import catalogue, config
 from adoc.cli import Command
 from adoc.config import Config
+from adoc.errors import Refused
 from adoc.i18n import t
-from adoc.lint import split_frontmatter
+from adoc.lint import find_heading, split_frontmatter
 
 
 def add_args(p: argparse.ArgumentParser) -> None:
@@ -83,11 +84,15 @@ def render_frontmatter(title: str, description: str, audience: list[str], update
 def sync_page(cfg: Config, page: dict, index: dict[str, dict], text: str) -> str:
     """フロントマターと関連ページ節をカタログに合わせた本文を返す."""
     raw, body = split_frontmatter(text)
+    if raw is None and text.removeprefix("\ufeff").startswith("---"):
+        raise Refused(f"front matter of {page['path']} is not closed; fix it before running toc")
     try:
         fm = yaml.safe_load(raw) if raw is not None else {}
-    except yaml.YAMLError:
-        fm = {}
-    fm = fm if isinstance(fm, dict) else {}
+    except yaml.YAMLError as e:
+        raise Refused(f"cannot parse front matter of {page['path']}: {e}") from e
+    if fm is not None and not isinstance(fm, dict):
+        raise Refused(f"front matter of {page['path']} is not a mapping")
+    fm = fm or {}
     description = fm.get("description")
     if not isinstance(description, str) or not description:
         description = page["brief"]
@@ -103,11 +108,9 @@ def sync_page(cfg: Config, page: dict, index: dict[str, dict], text: str) -> str
             continue
         rel = Path(os.path.relpath(catalogue.page_file(cfg, q), here)).as_posix()
         items.append(f"- [{q['title']}]({rel})")
-    m = re.search(r"^" + re.escape(heading) + r"[ \t]*$", body, re.MULTILINE)
-    if m:
-        nxt = re.search(r"^## ", body[m.end():], re.MULTILINE)
-        before = body[: m.start()]
-        after = body[m.end() + nxt.start():] if nxt else ""
+    span = find_heading(body, heading)
+    if span:
+        before, after = body[: span[0]], body[span[1]:]
     elif items:
         before, after = body.rstrip("\n") + "\n\n", ""
     else:
@@ -119,6 +122,11 @@ def sync_page(cfg: Config, page: dict, index: dict[str, dict], text: str) -> str
 
 def run(args: argparse.Namespace) -> int:
     cfg = config.load(Path.cwd())
+    with catalogue.locked(cfg):
+        return _run(args, cfg)
+
+
+def _run(args: argparse.Namespace, cfg: config.Config) -> int:
     data = catalogue.load(cfg)
     changed: list[Path] = []
     writes: list[tuple[Path, str]] = []

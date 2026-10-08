@@ -34,3 +34,10 @@ def test_save_roundtrips_canonical(five):
     before = cfg.catalogue.read_text(encoding="utf-8")
     catalogue.save(cfg, catalogue.load(cfg))
     assert cfg.catalogue.read_text(encoding="utf-8") == before
+
+
+def test_empty_sources_rejected_by_schema(repo):
+    repo.config()
+    repo.catalogue([{"id": "g/p", "sources": []}])
+    with pytest.raises(Refused, match="sources"):
+        catalogue.load(config.load(repo.root))

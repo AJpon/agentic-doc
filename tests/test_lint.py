@@ -136,3 +136,33 @@ def test_mermaid_syntax_error_reported(wiki):
     assert run_cli(wiki.root, "lint", "--json", "--mermaid", "g/page")[0] == 0
     add_to_mermaid("A -->")(wiki)
     assert "mermaid-syntax" in issue_codes(wiki, "--mermaid", "g/page")
+
+
+def test_cited_file_deleted_in_worktree_is_cite_missing(wiki):
+    (wiki.root / "src/f.py").unlink()
+    code, out, err = run_cli(wiki.root, "lint", "--json", "--skip-sources", "g/page")
+    assert code == 1, err
+    assert "cite-missing" in {i["code"] for i in json.loads(out)["issues"]}
+
+
+def test_line_count_splits_only_on_newline(wiki):
+    wiki.write("src/ff.c", "l1\nl2\fx\nl3\n")
+    wiki.commit()
+    append("`src/ff.c:3`")(wiki)
+    assert issue_codes(wiki, "g/page", "--skip-sources") == set()
+    out = run_cli(wiki.root, "lint", "--citations", "g/page")[1]
+    assert "--- src/ff.c:3 (3 lines)" in out and "    3| l3" in out
+
+
+def test_region_language_tag_uses_base_language(wiki):
+    wiki.config(language="ja-JP")
+    for name in ("page", "other"):
+        p = wiki.root / f"docs/wiki/g/{name}.md"
+        p.write_text(p.read_text().replace("## Related pages", "## 関連ページ"))
+    assert issue_codes(wiki) == set()
+
+
+def test_unexpected_error_exits_2(wiki):
+    p = wiki.root / "docs/wiki/g/page.md"
+    p.write_bytes(b"\xff\xfe broken")
+    assert run_cli(wiki.root, "lint", "g/page")[0] == 2

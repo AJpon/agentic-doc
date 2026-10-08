@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """コマンドライン入口."""
-    for stream in (sys.stdout, sys.stderr):
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8")
         except (AttributeError, ValueError):
@@ -64,6 +64,12 @@ def main(argv: list[str] | None = None) -> int:
         return args._run(args)
     except Refused as e:
         print(f"refused: {e}", file=sys.stderr)
+        return 2
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"refused: {e}", file=sys.stderr)
+        return 2
+    except Exception as e:  # noqa: BLE001 — 想定外の失敗も「指摘あり」(1) と区別できるよう 2 にする
+        print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
 
 

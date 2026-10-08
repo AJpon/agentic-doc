@@ -1,6 +1,10 @@
 """カタログ（既定 <wiki_dir>/catalogue.json）の読み書き."""
 
 import json
+import os
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -40,17 +44,50 @@ def load(cfg: Config) -> dict:
     return data
 
 
+LOCK_TIMEOUT = 30.0
+
+
+@contextmanager
+def locked(cfg: Config) -> Iterator[None]:
+    """カタログの読み書きを他のプロセスと排他する（<catalogue>.lock を O_EXCL で作る）."""
+    lock = cfg.catalogue.with_name(cfg.catalogue.name + ".lock")
+    deadline = time.monotonic() + LOCK_TIMEOUT
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.monotonic() > deadline:
+                raise Refused(f"catalogue is locked: {_rel(cfg, lock)} (delete it if no other command is running)")
+            time.sleep(0.05)
+    try:
+        os.close(fd)
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
+
+
 def ensure_canonical(cfg: Config) -> None:
-    """ディスク上のカタログが正規の書式でなければ Refused."""
-    original = cfg.catalogue.read_text(encoding="utf-8")
+    """ディスク上のカタログが正規の書式（改行は LF）でなければ Refused."""
+    original = cfg.catalogue.read_bytes().decode("utf-8")
     if dump(json.loads(original)) != original:
-        raise Refused("catalogue is not in canonical format (2-space JSON); refusing to rewrite")
+        raise Refused("catalogue is not in canonical format (2-space JSON, LF); refusing to rewrite")
 
 
 def save(cfg: Config, data: dict) -> None:
-    """カタログを書く。ディスク上の元テキストが正規の書式でなければ Refused."""
+    """カタログを一時ファイル経由で置き換える。元が正規の書式でなければ Refused."""
     ensure_canonical(cfg)
-    cfg.catalogue.write_bytes(dump(data).encode("utf-8"))
+    tmp = cfg.catalogue.with_name(cfg.catalogue.name + f".{os.getpid()}.tmp")
+    tmp.write_bytes(dump(data).encode("utf-8"))
+    for attempt in range(20):
+        try:
+            os.replace(tmp, cfg.catalogue)
+            return
+        except PermissionError:  # Windows で他のプロセスが読んでいる間は置き換えられない
+            if attempt == 19:
+                tmp.unlink(missing_ok=True)
+                raise
+            time.sleep(0.05)
 
 
 def page_index(data: dict) -> dict[str, dict]:
