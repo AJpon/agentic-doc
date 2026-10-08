@@ -16,13 +16,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from adoc import cmd_config, cmd_status
+from adoc import cmd_config, cmd_plan, cmd_status
 from adoc.cli import Command
 from adoc.errors import Refused
 
 COMMANDS: dict[str, Command] = {
     "config": cmd_config.COMMAND,
     "status": cmd_status.COMMAND,
+    "plan": cmd_plan.COMMAND,
 }
 
 
