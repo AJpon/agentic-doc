@@ -809,7 +809,7 @@ git commit -m "feat(scripts): post_commands を実行する post を追加"
 
 **Files:**
 - Create: `tests/test_integrity.py`
-- Modify: `AGENTS.md`（コマンドの節）、`docs/superpowers/specs/2026-10-08-agentic-doc-wiki-plugin-design.md`（8 章のコマンド表に `findings` と `config check` の引数、6 章にカタログの任意の `title`、8 章に glob の解釈）
+- Modify: `AGENTS.md`（コマンドの節）、`docs/superpowers/specs/2026-10-08-agentic-doc-wiki-plugin-design.md`（実装中に新たに決めたことがあれば）
 - Modify: `.github/workflows/`（pytest を走らせるワークフローを追加。ファイル名 `tests.yml`）
 
 **Interfaces:**
@@ -845,7 +845,7 @@ def test_every_command_has_help():
 - [ ] **Step 3: 文書とワークフローを更新する**
 
 - `AGENTS.md` のコマンド節に `uv run pytest`、`uv run ruff check .`、`uv run --script skills/wiki/scripts/agentic_doc.py --help` を足し、「テストスイートはまだ無い」の行を削除する
-- 仕様書に、この計画で決めたこと（`findings` コマンド、カタログの任意の `title`、glob の `:(glob)` 解釈、状態の内部名 missing / unverified / unresolved / changed / fresh）を反映する
+- 計画作成時に決めたこと（`findings` コマンド、カタログの任意の `title`、glob の `:(glob)` 解釈、状態の内部名、`post-backslash`）は仕様書に反映済み。実装中の Ruling で仕様に関わるものがあれば、それを仕様書に反映する
 - `.github/workflows/tests.yml`: `pull_request` と `push`（main）で、`astral-sh/setup-uv` → `uv sync` → `uv run pytest` → `uv run ruff check .` を ubuntu-latest・macos-latest・windows-latest の 3 OS で走らせる
 
 - [ ] **Step 4: 通ることを確かめる**

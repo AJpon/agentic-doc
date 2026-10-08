@@ -45,6 +45,7 @@
 | source_commit | そのページが最後に検証を通ったときの HEAD の SHA |
 | 縮退動作 | Workflow を持たないハーネスで、入口スキルを 1 体のエージェントが直列に実行すること |
 | 対象ファイル | `git ls-files` で得られる追跡済みファイルから `exclude` を除いたもの |
+| glob | `sources` と `exclude` の書き方。git の pathspec の `:(glob)` 規則で解釈する。`*` は `/` を越えず、`**` は越える。`git ls-files` と `git diff` に同じ pathspec を渡す |
 
 ## 4. 全体構成
 
@@ -156,7 +157,10 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 - `context` / `instructions` の `file` が存在しない
 - `post_commands` の要素が `{files}` を含まない
 
-`exclude` の glob が 1 件もファイルにマッチしない場合は警告にとどめる（打ち間違いの可能性）。
+次の場合は警告にとどめる。
+
+- `exclude` の glob が 1 件もファイルにマッチしない（打ち間違いの可能性）
+- `post_commands` の要素にバックスラッシュが含まれる（`post-backslash`）。`shlex.split` は POSIX の規則で分割するため、パスは Windows でもスラッシュ区切りで書く
 
 ## 6. カタログ
 
@@ -189,7 +193,8 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 - `pages` 配列の並び順が読む順序の正である。
 - 章は最大 6、1 章あたりのページは最大 8、全ページ数は `max_pages` 以下。
 - `audience` の値は設定ファイルの `audiences[].id` のどれか。
-- `sources` の各 glob は対象ファイルに 1 件以上マッチする。
+- `sources` の各 glob は対象ファイルに 1 件以上マッチする。glob の解釈は 3 章のとおりで、`*` は 1 階層しかマッチしない。元実装から移したカタログで `*` が深い階層を指していた場合は `**` に直す（0 件マッチは `lint` が報告する）。
+- トップレベルに任意の `title`（文字列）を置ける。`toc` が目次の H1 に使い、無ければ言語ごとの既定の見出しを使う。
 - JSON は 2 スペースインデント、非 ASCII 文字はエスケープしない、末尾に改行 1 つ。スクリプトはこの書式で読み書きし、`source_commit` と `reviewed_at` 以外のバイトを変えない。
 - カタログが Wiki ディレクトリの中にあっても、ページとしては扱わない。
 
@@ -268,13 +273,15 @@ dev/testing              未検証      -          2026-10-07   保留中の指�
 次の操作: sync で 3 ページを書き直す / 解決不能の 1 ページは内容を確認して stamp
 ```
 
-| 状態 | 条件（上から順に判定） |
-|---|---|
-| 未生成 | `path` のファイルが無い |
-| 未検証 | `source_commit` が null |
-| 解決不能 | `source_commit` が現在のリポジトリでコミットとして解決できない |
-| 変更あり | `git diff --name-only <source_commit>..HEAD -- <sources>` が空でない |
-| 最新 | 上のどれにも当たらない |
+| 状態 | 内部名 | 条件（上から順に判定） |
+|---|---|---|
+| 未生成 | `missing` | `path` のファイルが無い |
+| 未検証 | `unverified` | `source_commit` が null |
+| 解決不能 | `unresolved` | `source_commit` が現在のリポジトリでコミットとして解決できない |
+| 変更あり | `changed` | `git diff --name-only <source_commit>..HEAD -- <sources>` が空でない |
+| 最新 | `fresh` | 上のどれにも当たらない |
+
+内部名は `--state` の値と `--json` の出力に使う。表示は設定の `language` に合わせて訳す。
 
 引数: `status [<id>...]`、`--state <状態>`、`--verbose`（変わったファイルの全件と sources を出す）、`--json`（`plan` と `stamp` の候補表示が使う）。sources に該当する未コミットの変更と、未追跡で ignore もされていないファイルがあれば警告し、先にコミットするよう案内する。
 
@@ -318,6 +325,7 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | `lint` | 機械的な検査（7.5 の 1）。`--citations <id>` で、ページ内の全引用と引用先の実際の行を並べて出す（引用レンズが使う） |
 | `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する |
 | `stamp` | 7.6 |
+| `findings` | 未解決の指摘（10.2）を保存・表示・削除する。`findings save <id> <file>`（`-` で標準入力）、`findings show <id>`（本文のハッシュが一致しなければ破棄して `null`）、`findings clear <id>`。Workflow はファイルを書けないため、エージェントがこのコマンドで保存する |
 | `toc` | カタログから目次（`<wiki_dir>/README.md`）を生成し、`related` の相互リンクを双方向にし、各ページのフロントマターの `title` / `audience` / `updated` をカタログに揃える |
 | `post` | `post_commands` を実行する |
 
