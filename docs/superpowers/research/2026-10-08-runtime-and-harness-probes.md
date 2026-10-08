@@ -32,7 +32,24 @@ $ claude -p "/agentic-doc-probe:run-probe" --allowedTools "Workflow,Read,Skill"
 
 ## 2. Agent Plugins 1.0
 
-（VS Code と Codex CLI の確認結果を待って追記する。Claude Code 側で確認できたことだけを先に記す）
+環境: VS Code 1.141（Copilot Chat のエージェントモード、所有者が実施）、Codex CLI 0.161.0、Claude Code 2.1.285
+
+| 問い | VS Code（Copilot） | Codex CLI | Claude Code |
+|---|---|---|---|
+| ルートの `plugin.json`（Agent Plugins 1.0）だけのプラグインからスキルを読み込めるか | はい（`chat.pluginLocations` で追加） | はい（ローカルのマーケットプレイス経由でインストール） | はい（`--plugin-dir`） |
+| スキルと同じディレクトリの `scripts/hello.py` を実行できるか | はい（`SCRIPT-OK-91ad`） | はい（`SCRIPT-OK-91ad`） | はい（`SCRIPT-OK-91ad`） |
+| スキルからスクリプトを指せた書き方 | 「この SKILL.md と同じディレクトリの `scripts/hello.py`」。エージェントが絶対パスに解決した | 同左。インストール先のキャッシュ（`~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/`）の絶対パスに解決した | 同左。スキルのベースディレクトリから解決した |
+| スキル本文の `${PLUGIN_ROOT}` が展開されるか | いいえ（文字列のまま） | いいえ（文字列のまま） | いいえ（文字列のまま） |
+| 両方のマニフェストを置いたとき、どちらで読み込むか | スキルは読み込まれたが、プラグイン名の表示を確認できていない（未確認） | 試していない | `.claude-plugin/plugin.json` |
+
+### 分かったこと
+
+- **3 ハーネスとも「SKILL.md と同じディレクトリからの相対パス」で動く。** 変数の展開に頼らず、この書き方に統一すればよい。
+- **`${PLUGIN_ROOT}` はスキル本文では展開されない。** VS Code のドキュメントでもトークンはフックのコマンド用とされている。スキル本文では使わない。Claude Code の `${CLAUDE_PLUGIN_ROOT}` はスキル本文で展開される（1 節）が、Claude Code 専用なので、使うのは Workflow にパスを渡す箇所だけにする。
+- **Codex はプラグインをキャッシュにコピーしてから読み込む。** スクリプトはプラグイン内の相対位置だけを前提にし、リポジトリ内の位置を前提にしてはならない。Codex のローカルマーケットプレイスは `.claude-plugin/marketplace.json` の形式をそのまま読んだ。
+- VS Code では、1 回目の実行でスクリプトの出力に端末のプロンプト文字列が混ざった（`SCRIPT-OK-91adok-Air:`）。2 回目は正しく出た。エージェントがターミナルの出力を読む際の揺れとみられ、プラグインの構成とは関係しない。
+
+Claude Code で補足的に確かめたこと:
 
 - ルートに Agent Plugins 1.0 の `plugin.json`（`$schema` 付き）だけを置いたプラグインは、`claude plugin validate` を通る。
 - ルートの `plugin.json` と `.claude-plugin/plugin.json` の両方を置いた場合、Claude Code は `.claude-plugin/plugin.json` の名前（`agentic-doc-probe-cc`）で読み込む。validate の警告は `author` が無いことだけ。
