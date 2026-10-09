@@ -38,7 +38,7 @@ def test_pep723_block_declares_runtime():
 
 
 def test_every_command_has_help():
-    assert set(COMMANDS) == {"config", "status", "plan", "checkpoint", "stamp", "findings", "lint", "toc", "post"}
+    assert set(COMMANDS) == {"config", "status", "plan", "checkpoint", "stamp", "findings", "lint", "toc", "post", "catalogue"}
     for c in COMMANDS.values():
         assert c.help and len(c.help) < 100
 

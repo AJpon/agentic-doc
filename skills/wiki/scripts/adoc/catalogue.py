@@ -77,6 +77,12 @@ def ensure_canonical(cfg: Config) -> None:
 def save(cfg: Config, data: dict) -> None:
     """カタログを一時ファイル経由で置き換える。元が正規の書式でなければ Refused."""
     ensure_canonical(cfg)
+    replace(cfg, data)
+
+
+def replace(cfg: Config, data: dict) -> None:
+    """書式を確かめずに、一時ファイルからの置き換えでカタログを書く（呼び出し側が locked で囲む）."""
+    cfg.catalogue.parent.mkdir(parents=True, exist_ok=True)
     tmp = cfg.catalogue.with_name(cfg.catalogue.name + f".{os.getpid()}.tmp")
     tmp.write_bytes(dump(data).encode("utf-8"))
     for attempt in range(20):
