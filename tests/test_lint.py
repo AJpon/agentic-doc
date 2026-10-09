@@ -158,7 +158,7 @@ def test_region_language_tag_uses_base_language(wiki):
     wiki.config(language="ja-JP")
     for name in ("page", "other"):
         p = wiki.root / f"docs/wiki/g/{name}.md"
-        p.write_text(p.read_text().replace("## Related pages", "## 関連ページ"))
+        p.write_text(p.read_text(encoding="utf-8").replace("## Related pages", "## 関連ページ"), encoding="utf-8")
     assert issue_codes(wiki) == set()
 
 
