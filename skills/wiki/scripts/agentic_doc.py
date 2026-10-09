@@ -23,6 +23,7 @@ from adoc import (
     cmd_findings,
     cmd_plan,
     cmd_post,
+    cmd_report,
     cmd_stamp,
     cmd_status,
     cmd_toc,
@@ -42,6 +43,7 @@ COMMANDS: dict[str, Command] = {
     "toc": cmd_toc.COMMAND,
     "post": cmd_post.COMMAND,
     "catalogue": cmd_catalogue.COMMAND,
+    "report": cmd_report.COMMAND,
 }
 
 

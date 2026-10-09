@@ -301,6 +301,16 @@ def show_citations(cfg: Config, page: dict) -> None:
                 print(f"{i:>5}| {lines[i - 1]}")
 
 
+def collect(cfg: Config, data: dict, targets: list[dict], check_sources: bool = True,
+            mermaid: bool = False) -> list[dict]:
+    """targets の全指摘（--mermaid なら Mermaid の構文も）."""
+    ctx = _Ctx(cfg)
+    issues = [i for p in targets for i in lint_page(cfg, p, data["pages"], check_sources=check_sources, ctx=ctx)]
+    if mermaid:
+        issues += mermaid_issues(cfg, targets) or []
+    return issues
+
+
 def add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("ids", nargs="*", metavar="ID", help="page ids (default: all)")
     p.add_argument("--json", action="store_true", help="print JSON")
@@ -319,11 +329,7 @@ def run(args: argparse.Namespace) -> int:
         show_citations(cfg, catalogue.select(data, [args.citations])[0])
         return 0
     targets = catalogue.select(data, args.ids)
-    ctx = _Ctx(cfg)
-    issues = [i for p in targets for i in lint_page(cfg, p, data["pages"], check_sources=not args.skip_sources,
-                                                    ctx=ctx)]
-    if args.mermaid:
-        issues += mermaid_issues(cfg, targets) or []
+    issues = collect(cfg, data, targets, check_sources=not args.skip_sources, mermaid=args.mermaid)
     stale = []
     for p in targets:
         st = state.classify(cfg, p)
