@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agentic-doc outline result",
+  "description": "Result of merging the proposals and installing the catalogue (outline-merge)",
+  "type": "object",
+  "required": [
+    "installed",
+    "catalogue",
+    "page_count",
+    "rationale",
+    "issues"
+  ],
+  "properties": {
+    "installed": {
+      "type": "boolean"
+    },
+    "catalogue": {
+      "type": "string"
+    },
+    "page_count": {
+      "type": "integer"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

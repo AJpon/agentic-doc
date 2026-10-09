@@ -51,6 +51,9 @@ def test_reference_script_calls_are_quoted_and_exist():
             words = m.group("rest").split()
             if words and words[0] == "<command>":  # 呼び出し方の書式の説明
                 continue
+            if words and words[0].startswith("--"):  # トップレベルのオプション（--help）
+                assert words[0] in table[""][0], f"{doc}: unknown option {words[0]}"
+                continue
             assert words and words[0] in commands, f"{doc}: unknown command in {m.group(0)!r}"
             name = words[0]
             if len(words) > 1 and words[1] in table[name][1]:
@@ -102,3 +105,23 @@ def test_writing_rules_cover_spec_chapter_9():
     for needle in ["title", "description", "audience", "updated", "style", "classDef", "fill:", "stroke:",
                    "<br/>", "5", "related_heading", "unverified_marker", "no_code"]:
         assert needle in text, needle
+
+
+def test_run_docs_reference_every_phase_doc():
+    expected = {
+        "run-sync.md": ["sync-research.md", "sync-write.md", "verify-citation.md", "verify-claim.md", "sync-fix.md",
+                        "sync-integrate.md"],
+        "run-outline.md": ["outline-areas.md", "outline-survey.md", "outline-propose.md", "outline-merge.md"],
+        "run-audit.md": ["audit-drift.md", "agentic_doc.py\" report"],
+    }
+    for doc, needles in expected.items():
+        text = (REFS / doc).read_text(encoding="utf-8")
+        for n in needles:
+            assert n in text, f"{doc}: {n}"
+
+
+def test_overview_lists_all_modes():
+    text = (REFS / "overview.md").read_text(encoding="utf-8")
+    for needle in ["help", "setup", "outline", "sync", "status", "audit", "stamp",
+                   "missing", "unverified", "unresolved", "changed", "fresh"]:
+        assert f"`{needle}`" in text, needle
