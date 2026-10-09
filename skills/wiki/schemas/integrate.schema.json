@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agentic-doc integrate result",
+  "description": "Table of contents, links and post_commands (sync-integrate)",
+  "type": "object",
+  "required": [
+    "toc_files",
+    "links_fixed",
+    "broken_links_remaining",
+    "post_ran",
+    "post_passed",
+    "reverted"
+  ],
+  "properties": {
+    "toc_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "links_fixed": {
+      "type": "integer"
+    },
+    "broken_links_remaining": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "post_ran": {
+      "type": "boolean"
+    },
+    "post_passed": {
+      "type": "boolean"
+    },
+    "reverted": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
