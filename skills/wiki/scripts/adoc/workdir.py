@@ -36,12 +36,19 @@ def _read(cfg: Config, page_id: str, page_text: str) -> tuple[list[dict] | None,
         return None, False
 
 
-def save(cfg: Config, page_id: str, findings: list[dict], page_text: str) -> Path:
-    """指摘とページ本文のハッシュを保存する。初回は .gitignore を置く."""
-    ignore = work_dir(cfg) / ".gitignore"
+def ensure_root(cfg: Config) -> Path:
+    """作業ディレクトリを作り、初回は .gitignore を置く（既にあれば上書きしない）."""
+    root = work_dir(cfg)
+    ignore = root / ".gitignore"
     if not ignore.exists():
-        ignore.parent.mkdir(parents=True, exist_ok=True)
+        root.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(GITIGNORE_TEMPLATE, ignore)
+    return root
+
+
+def save(cfg: Config, page_id: str, findings: list[dict], page_text: str) -> Path:
+    """指摘とページ本文のハッシュを保存する."""
+    ensure_root(cfg)
     path = findings_path(cfg, page_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {"page_sha256": _sha256(page_text), "findings": findings}

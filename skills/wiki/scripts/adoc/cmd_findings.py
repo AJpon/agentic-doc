@@ -5,9 +5,13 @@ import json
 import sys
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 from adoc import catalogue, config, workdir
 from adoc.cli import Command
 from adoc.errors import Refused
+
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "findings.schema.json"
 
 
 def add_args(p: argparse.ArgumentParser) -> None:
@@ -27,8 +31,11 @@ def _read_findings(src: str) -> list:
         data = json.loads(text)
     except json.JSONDecodeError as e:
         raise Refused(f"findings are not valid JSON: {e.msg}") from e
-    if not isinstance(data, list):
-        raise Refused("findings must be a JSON array")
+    validator = Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
+    errors = sorted(validator.iter_errors(data), key=lambda e: list(e.absolute_path))
+    if errors:
+        e = errors[0]
+        raise Refused(f"findings do not match the schema: /{'/'.join(str(p) for p in e.absolute_path)}: {e.message}")
     return data
 
 

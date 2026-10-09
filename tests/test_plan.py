@@ -44,3 +44,9 @@ def test_plan_targets_carry_catalogue_fields(five):
 
 def test_plan_default_today_is_iso_date(five):
     assert len(plan(five)["today"]) == 10
+
+
+def test_plan_reports_dirs_and_ignores_workdir(five):
+    d = plan(five)
+    assert d["wiki_dir"] == "docs/wiki" and d["work_dir"] == ".agentic-doc/work"
+    assert (five.root / ".agentic-doc/work/.gitignore").read_text(encoding="utf-8") == "*\n"

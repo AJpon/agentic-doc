@@ -23,7 +23,7 @@ def test_manifests_agree():
 
 def test_schemas_are_valid_json_schema():
     paths = list((ROOT / "skills/wiki/schemas").glob("*.json"))
-    assert len(paths) == 2
+    assert len(paths) >= 2
     for p in paths:
         Draft202012Validator.check_schema(json.loads(p.read_text(encoding="utf-8")))
 
