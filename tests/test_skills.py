@@ -16,7 +16,7 @@ NOT_PHASE_SCHEMAS = {"config", "catalogue", "findings"}
 # スクリプトの呼び出し。wiki は "<SKILL_DIR>/scripts/..."、wiki-setup は "<SKILL_DIR>/../wiki/scripts/..."
 CALL = re.compile(r'"<SKILL_DIR>/(?:\.\./wiki/)?scripts/agentic_doc\.py"(?P<rest>[^`\n]*)')
 ANY_CALL = re.compile(r"agentic_doc\.py")
-REF_LINK = re.compile(r"<SKILL_DIR>/(?:\.\./wiki/)?((?:references|schemas)/[\w.-]+)")
+REF_LINK = re.compile(r"<SKILL_DIR>/((?:\.\./wiki/)?(?:references|schemas)/[\w.-]+)")
 
 
 def skill_docs() -> list[Path]:
@@ -64,8 +64,9 @@ def test_reference_script_calls_are_quoted_and_exist():
 
 def test_reference_links_resolve():
     for doc in skill_docs():
+        skill_dir = ROOT / "skills" / doc.relative_to(ROOT / "skills").parts[0]
         for rel in REF_LINK.findall(doc.read_text(encoding="utf-8")):
-            assert (WIKI / rel).is_file(), f"{doc}: {rel} does not exist"
+            assert (skill_dir / rel).resolve().is_file(), f"{doc}: {rel} does not exist"
 
 
 def test_each_reference_has_inputs_and_output_sections():
@@ -125,3 +126,33 @@ def test_overview_lists_all_modes():
     for needle in ["help", "setup", "outline", "sync", "status", "audit", "stamp",
                    "missing", "unverified", "unresolved", "changed", "fresh"]:
         assert f"`{needle}`" in text, needle
+
+
+def test_skill_frontmatter():
+    import yaml
+
+    for name in ["wiki", "wiki-setup"]:
+        fm = yaml.safe_load((ROOT / f"skills/{name}/SKILL.md").read_text(encoding="utf-8").split("---")[1])
+        assert fm["name"] == name and 20 < len(fm["description"]) < 1024
+
+
+def test_wiki_skill_routes_every_mode_and_both_harnesses():
+    text = (WIKI / "SKILL.md").read_text(encoding="utf-8")
+    for needle in ["agentic-doc:wiki-run", "${CLAUDE_PLUGIN_ROOT}", "run-outline.md", "run-sync.md", "run-audit.md",
+                   "overview.md", 'report --drift -', "config check", "wiki-setup"]:
+        assert needle in text, needle
+    assert text.count("${CLAUDE_PLUGIN_ROOT}") == 1
+
+
+def test_setup_skill_points_to_wiki_scripts():
+    text = (ROOT / "skills/wiki-setup/SKILL.md").read_text(encoding="utf-8")
+    assert "references/setup.md" in text
+    setup = (ROOT / "skills/wiki-setup/references/setup.md").read_text(encoding="utf-8")
+    for needle in ['"<SKILL_DIR>/../wiki/scripts/agentic_doc.py" config check', "$schema", "_catalogue.json",
+                   "source-glob-empty", "cite-excluded"]:
+        assert needle in setup, needle
+
+
+def test_plugin_root_token_not_used():
+    for p in (ROOT / "skills").rglob("*.md"):
+        assert "${PLUGIN_ROOT}" not in p.read_text(encoding="utf-8"), p
