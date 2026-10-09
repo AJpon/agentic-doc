@@ -8,7 +8,8 @@ PY = sys.executable.replace("\\", "/")  # Windows でも shlex で壊れない�
 
 
 def test_files_expand_one_arg_each_without_shell(repo):
-    repo.config(post_commands=[f'"{PY}" -c "import sys; print(sys.argv[1:])" {{files}}'])
+    code = "import sys; sys.stdout.reconfigure(encoding='utf-8'); print(sys.argv[1:])"
+    repo.config(post_commands=[f'"{PY}" -c "{code}" {{files}}'])
     d = json.loads(run_cli(repo.root, "post", "--json", "a b.md", "日本.md", "$(x).md")[1])
     assert d[0]["stdout"].strip() == "['a b.md', '日本.md', '$(x).md']"
     assert d[0]["code"] == 0
