@@ -97,10 +97,18 @@ def build(cfg, data: dict, drift: dict, mermaid: bool = False) -> dict:
     drift_major = [d["page_id"] for d in drift["results"] if any(RANK[i["severity"]] >= 2 for i in d["issues"])]
     if drift_major:
         nxt.append(t(lang, "report_drift_sync", ids=ids(drift_major)))
+    changed = {s.id for s in statuses if s.state == State.CHANGED}
+    drift_minor = [d["page_id"] for d in drift["results"] if d["issues"] and d["page_id"] in changed
+                   and d["page_id"] not in drift_major]
+    if drift_minor:
+        nxt.append(t(lang, "report_stamp_or_sync", ids=ids(drift_minor)))
+    audited = {d["page_id"] for d in drift["results"]} | set(drift["failed"])
+    unaudited = [s.id for s in statuses if s.state == State.CHANGED and s.id not in audited]
+    if unaudited:
+        nxt.append(t(lang, "report_changed_unaudited", ids=ids(unaudited)))
     lint_pages = list(dict.fromkeys(i["page"] for i in issues))
     if lint_pages:
         nxt.append(t(lang, "report_fix_lint", ids=ids(lint_pages)))
-    changed = {s.id for s in statuses if s.state == State.CHANGED}
     quiet = [d["page_id"] for d in drift["results"] if not d["issues"] and d["page_id"] in changed]
     if quiet:
         nxt.append(t(lang, "report_stamp_quiet", ids=ids(quiet)))

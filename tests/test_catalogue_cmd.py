@@ -252,3 +252,20 @@ def test_migrate_warns_language_mismatch(legacy):
     assert code == 0
     assert any("language" in w for w in result["warnings"])
     assert result["chapters"] == 1 and result["pages"] == 2
+
+
+def test_duplicate_chapter(good):
+    mutate(good, lambda d: d["chapters"].append({"id": "a", "title": "A2", "description": "d"}))
+    assert_error(good, "duplicate-chapter")
+
+
+@pytest.mark.parametrize("bad", ["A/one", "a/One", "a/on e", "a/_x", "a/-x"])
+def test_id_chars(good, bad):
+    mutate(good, lambda d: d["pages"].append(_page(bad, path=bad + ".md")))
+    assert_error(good, "id-chars")
+
+
+def test_install_creates_work_gitignore(good):
+    good.write("other/catalogue.json", dump(GOOD))
+    assert run_cli(good.root, "catalogue", "install", "other/catalogue.json")[0] == 0
+    assert (good.root / ".agentic-doc/work/.gitignore").is_file()

@@ -2,18 +2,20 @@
 
 import argparse
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-from adoc import catalogue, config, gitutil
+from adoc import catalogue, config, gitutil, workdir
 from adoc.cli import Command
 from adoc.config import Config
 from adoc.errors import Refused
 
 MAX_CHAPTERS = 6
 MAX_PAGES_PER_CHAPTER = 8
+ID_PART = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
 def add_args(p: argparse.ArgumentParser) -> None:
@@ -60,6 +62,12 @@ def check_data(cfg: Config, data: dict) -> list[dict]:
     for pid, n in Counter(ids).items():
         if n > 1:
             issues.append(_issue("error", "duplicate-id", f"{pid} appears {n} times"))
+    for ch, n in Counter(chapter_ids).items():
+        if n > 1:
+            issues.append(_issue("error", "duplicate-chapter", f"chapter {ch} appears {n} times"))
+    for ch in dict.fromkeys(chapter_ids):
+        if not ID_PART.fullmatch(ch):
+            issues.append(_issue("error", "id-chars", f"chapter {ch}: use lowercase letters, digits and hyphens"))
     if len(chapters) > MAX_CHAPTERS:
         issues.append(_issue("error", "chapter-count", f"{len(chapters)} chapters (at most {MAX_CHAPTERS})"))
     if len(pages) > cfg.max_pages:
@@ -77,6 +85,8 @@ def check_data(cfg: Config, data: dict) -> list[dict]:
         parts = pid.split("/")
         if len(parts) != 2 or not all(parts):
             issues.append(_issue("error", "id-form", f"{pid} is not <chapter>/<page>"))
+        elif not all(ID_PART.fullmatch(x) for x in parts):
+            issues.append(_issue("error", "id-chars", f"{pid}: use lowercase letters, digits and hyphens"))
         elif parts[0] not in chapter_ids:
             issues.append(_issue("error", "id-chapter", f"{pid}: chapter {parts[0]} is not in chapters"))
         if p["path"] != pid + ".md":
@@ -200,6 +210,7 @@ def run(args: argparse.Namespace) -> int:
         _print(issues, False)
         return 1
     cfg.catalogue.parent.mkdir(parents=True, exist_ok=True)
+    workdir.ensure_root(cfg)
     with catalogue.locked(cfg):
         if cfg.catalogue.exists() and not args.force:
             raise Refused(f"catalogue already exists: {cfg.catalogue.relative_to(cfg.root).as_posix()} — pass --force "
