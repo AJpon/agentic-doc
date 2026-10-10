@@ -23,7 +23,7 @@ def test_manifests_agree():
 
 def test_schemas_are_valid_json_schema():
     paths = list((ROOT / "skills/wiki/schemas").glob("*.json"))
-    assert len(paths) == 2
+    assert len(paths) >= 2
     for p in paths:
         Draft202012Validator.check_schema(json.loads(p.read_text(encoding="utf-8")))
 
@@ -38,7 +38,8 @@ def test_pep723_block_declares_runtime():
 
 
 def test_every_command_has_help():
-    assert set(COMMANDS) == {"config", "status", "plan", "checkpoint", "stamp", "findings", "lint", "toc", "post"}
+    assert set(COMMANDS) == {"config", "status", "plan", "checkpoint", "stamp", "findings", "lint", "toc", "post", "catalogue",
+                             "report", "unverify"}
     for c in COMMANDS.values():
         assert c.help and len(c.help) < 100
 

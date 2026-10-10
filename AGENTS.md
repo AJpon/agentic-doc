@@ -14,7 +14,7 @@ This file provides guidance to AI agents when working with code in this reposito
 | --- | --- |
 | `docs/superpowers/specs/2026-10-08-agentic-doc-wiki-plugin-design.md` | 設計仕様。設定ファイル、カタログ、モード、スクリプト、執筆規約、エラー処理はすべてここが正 |
 | `docs/superpowers/research/2026-10-08-runtime-and-harness-probes.md` | 実行方式とハーネスの検証記録。冒頭の「未確認」は検証済みと扱わない |
-| `docs/superpowers/plans/` | 実装計画。計画 1（土台づくり）と計画 2（決定的なスクリプト群）は完了済み。計画 3 以降はこれから作る |
+| `docs/superpowers/plans/` | 実装計画。計画 1（土台づくり）、計画 2（決定的なスクリプト群）、計画 3（スキル・参照文書・Workflow）は完了済み。計画 4（受入検証）はこれから |
 
 ## 構成
 
@@ -22,14 +22,15 @@ This file provides guidance to AI agents when working with code in this reposito
 plugin.json                          # Agent Plugins 1.0（Copilot / Codex が読む）
 .claude-plugin/plugin.json           # Claude Code 用。workflows の場所を指す
 .claude-plugin/marketplace.json
-skills/wiki/                         # 入口スキル（全ハーネス共通）
+skills/wiki/SKILL.md                 # 入口スキル（全ハーネス共通）。前提の検査、モードの振り分け、help
+skills/wiki/references/              # 各フェーズの手順（英語）。run-*.md は Workflow の無いハーネス向けの直列の手順
 skills/wiki/scripts/agentic_doc.py   # 決定的なスクリプトの入口（PEP 723）。コマンドの実装は scripts/adoc/cmd_*.py
-skills/wiki/schemas/                 # 設定ファイルとカタログの JSON Schema
+skills/wiki/schemas/                 # 設定・カタログ・各フェーズ出力の JSON Schema
 skills/wiki-setup/                   # 導入先の設定ファイルを作るスキル
-com.anthropic.claude-code/workflows/wiki-run.js   # Claude Code 専用のオーケストレーション
+com.anthropic.claude-code/workflows/wiki-run.js   # Claude Code 専用のオーケストレーション（制御だけ）
+dev/embed_schemas.py                 # schemas/ を wiki-run.js の生成ブロックに埋め込む
+tests/workflow_harness.mjs           # wiki-run.js を agent() のスタブで動かす node のハーネス
 ```
-
-スクリプトは実装済み。スキル本文と Workflow はまだ仮置き（計画 3 で作る）。
 
 ## 守ること
 
@@ -48,11 +49,14 @@ claude -p "/agentic-doc:wiki" --plugin-dir . --allowedTools "Workflow,Skill"   #
 uv run pytest                                       # テスト（tests/。一時 git リポジトリに対して CLI を実行する）
 uv run ruff check .                                 # リント（対象は skills/ と tests/ の Python）
 uv run --script skills/wiki/scripts/agentic_doc.py --help   # 導入先と同じ呼び出し方で CLI を確かめる
+uv run python dev/embed_schemas.py                  # schemas/ を変えたら wiki-run.js に埋め込み直す（--check で確認だけ）
 ```
 
 `claude -p` では、値を複数取る `--allowedTools` より前にプロンプトを書く。`lint --mermaid` のテストは、環境変数 `AGENTIC_DOC_MERMAID_MODULES` に mermaid と jsdom の入った `node_modules` を指定したときだけ動く。
 
 スクリプトに新しいコマンドを足すときは、`skills/wiki/scripts/adoc/cmd_<名前>.py` に `COMMAND` を定義して `agentic_doc.py` の `COMMANDS` に登録する。言語に依存する文字列は `adoc/i18n.py` の `ja` と `en` の両方に足す。
+
+参照文書・スキル本文を変えたら `tests/test_skills.py` が、スクリプトの呼び出し（コマンド名とオプション）と参照先の実在を検査する。Workflow を変えたら `tests/test_workflow.py`（node が必要）で制御を確かめる。
 
 ## 開発ルール
 

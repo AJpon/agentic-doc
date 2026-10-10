@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agentic-doc fix result",
+  "description": "What a fix round changed or disputed (sync-fix)",
+  "type": "object",
+  "required": [
+    "changed",
+    "disputed"
+  ],
+  "properties": {
+    "changed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disputed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

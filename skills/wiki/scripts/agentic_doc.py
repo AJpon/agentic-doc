@@ -16,7 +16,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from adoc import cmd_checkpoint, cmd_config, cmd_findings, cmd_plan, cmd_post, cmd_stamp, cmd_status, cmd_toc, lint
+from adoc import (
+    cmd_catalogue,
+    cmd_checkpoint,
+    cmd_config,
+    cmd_findings,
+    cmd_plan,
+    cmd_post,
+    cmd_report,
+    cmd_stamp,
+    cmd_status,
+    cmd_toc,
+    cmd_unverify,
+    lint,
+)
 from adoc.cli import Command
 from adoc.errors import Refused
 
@@ -30,6 +43,9 @@ COMMANDS: dict[str, Command] = {
     "lint": lint.COMMAND,
     "toc": cmd_toc.COMMAND,
     "post": cmd_post.COMMAND,
+    "catalogue": cmd_catalogue.COMMAND,
+    "report": cmd_report.COMMAND,
+    "unverify": cmd_unverify.COMMAND,
 }
 
 

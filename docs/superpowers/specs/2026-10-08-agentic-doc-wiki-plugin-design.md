@@ -72,6 +72,8 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 ```
 
 - Workflow の各エージェントには、「`<スキルのパス>/references/<フェーズ>.md` を読んで従え。対象ページは〜」という短い指示とスキーマだけを渡す。プロンプトの本文は Workflow に書かない。
+- スキーマの正は `skills/wiki/schemas/` に置く。Workflow はファイルを読めないため、`dev/embed_schemas.py` が `wiki-run.js` の生成ブロックに写しを埋め込み、整合テストで一致を固定する。
+- 参照文書とスキル本文は英語で書く。Wiki 本文は設定の `language` で書き、言語ごとの固定の文字列は `config show` の `strings` から取る。
 - 外部プラグイン（元実装の `deep-wiki:wiki-researcher`）には依存しない。
 - Copilot 用の名前空間ディレクトリは最初は作らない。スキルだけで呼び出せるため。
 
@@ -84,7 +86,9 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 **パスの受け渡し**
 
 - スキル本文からスクリプトや参照文書を指すときは、「この SKILL.md と同じディレクトリからの相対パス」で書く。Claude Code、VS Code（Copilot）、Codex の 3 つで動くことを確認した。`${PLUGIN_ROOT}` はスキル本文では展開されないので使わない。
-- Claude Code の Workflow はファイルシステムに触れず、日付も取得できない。入口スキルが Workflow を呼ぶときに、`args.plugin_root` に `${CLAUDE_PLUGIN_ROOT}`（スキル本文で展開される）を、`args.today` に当日の日付を入れて渡す。Workflow はこれをもとに参照文書とスクリプトの絶対パスを組み立て、エージェントに渡す。
+- 表記は `<SKILL_DIR>/...` に統一する。`<SKILL_DIR>` は wiki スキルの SKILL.md のあるディレクトリで、SKILL.md の冒頭で定義する。Workflow はその絶対パスをプロンプトの `SKILL_DIR = ...` 行で渡す。wiki-setup からは `<SKILL_DIR>/../wiki/` で wiki スキルを指す。
+- Claude Code の Workflow はファイルシステムに触れず、日付も取得できない。入口スキルが Workflow を呼ぶときに、`args.plugin_root` に `${CLAUDE_PLUGIN_ROOT}`（スキル本文で展開される）を入れて渡す。Workflow はこれをもとに参照文書とスクリプトの絶対パスを組み立て、エージェントに渡す。日付は `plan` が出す `today` を使う（`args.today` は上書きしたいときだけ渡す任意の値）。
+- Workflow の `args` は `{mode: "outline"|"sync"|"audit", plugin_root, pages?, force?, include_unresolved?, lint_only?, today?}`。
 - Workflow の `meta.name` は入口スキルと別の名前（`wiki-run`）にする。同じ名前だと、コマンドがスキルを経由せずに Workflow を直接起動し、`args` が渡らない。
 - Codex はプラグインをキャッシュ（`~/.codex/plugins/cache/...`）にコピーしてから読み込む。スクリプトはプラグイン内の相対位置だけを前提にし、プラグインのリポジトリ内の位置を前提にしない。
 
@@ -243,7 +247,7 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 1. 調査領域の決定: 1 体のエージェントがリポジトリの構成を見て 3〜5 の調査領域に分ける。
 2. 領域ごとの調査（Claude Code では並列）。
 3. 3 つの切り口（アーキテクチャの層 / データの流れ / 読者層）で構成案を作る（Claude Code では並列）。
-4. 構成案を評価・統合し、カタログを書く。
+4. 構成案を評価・統合し、`.agentic-doc/work/outline/catalogue.json` に書く。`catalogue check` が通るまで直し、`catalogue install`（`--force` は outline の `--force` のときだけ）で設定の場所に置く。
 5. `toc` で目次を生成する。
 
 既存のカタログがある場合、`--force` が無ければ上書きしない。上書きすると全ページの `source_commit` が null に戻る。
@@ -251,7 +255,7 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 ### 7.3 sync
 
 1. `plan` で対象ページを決める。既定の対象は「未生成」「未検証」「変更あり」の状態のページ。`--pages <id>...` で明示したページは状態に関係なく対象になる。「解決不能」のページは既定では対象にせず、`stamp` か `--pages` での再生成を案内する（`--include-unresolved` で対象に含める）。
-2. ページごとに research → write → verify（引用レンズと主張レンズ）→ fix（最大 2 ラウンド）。作業ディレクトリに未解決の指摘が残っているページは、research と write を飛ばして fix から始める（10 章）。
+2. 対象のうち `source_commit` を持つページ（`--pages` の明示や変更あり）は、`unverify` で未検証に戻してから処理する。ページごとに research → write → verify（引用レンズと主張レンズ。両方が終わらなければ未検証のまま）→ fix（最大 2 ラウンド）。作業ディレクトリに未解決の指摘が残っているページは、research と write を飛ばして fix から始める（10 章）。
 3. 検証を通ったページは、その時点で `checkpoint` が `source_commit` と `reviewed_at` を書く。
 4. 全ページの処理後、`toc` で目次・相互リンク・フロントマターを整え、`post_commands` を実行する。`toc` で直しきれなかった壊れたリンクはエージェントが直す。
 
@@ -289,7 +293,7 @@ dev/testing              未検証      -          2026-10-07   保留中の指�
 
 1. `lint`（LLM を使わない）: 引用先の実在と行範囲、フロントマター、相対リンク、Mermaid の禁止構文、`## 関連ページ` 節、未追跡ファイルを引用・sources に含むページ。
 2. drift（LLM を使う）: 「変更あり」のページだけについて、`source_commit` 以降の差分が本文の記述に影響するかを判定する。
-3. 報告はスクリプトが組み立てる。ページごとの最悪の重大度、件数、次の操作（`sync --pages`、`stamp --pages` など）を出す。
+3. 報告はスクリプト（`report`）が組み立てる。ページごとの最悪の重大度、件数、次の操作（`sync --pages`、`stamp --pages` など）を出す。drift の結果は `report --drift -` に標準入力で渡す。
 
 `--lint-only` で 1 だけを実行する。どのファイルも書き換えない。
 
@@ -320,12 +324,17 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | コマンド | 役割 |
 |---|---|
 | `config check` | 設定ファイルの検査（5.4） |
+| `config show` | 既定値を補った設定、`context` / `instructions` の本文（`file` は毎回読む）、言語ごとの固定の文字列（`strings`）を JSON で出す。全フェーズのエージェントが最初に読む |
+| `catalogue check [FILE]` | カタログを 6 章の制約（ID と path、章とページの上限、audience、related、sources の 0 件マッチなど）で検査する。FILE を省くと設定のカタログを検査し、書式も確かめる |
+| `catalogue install FILE [--force]` | 検査を通ったカタログを設定の場所に置く。既存のカタログは `--force` が無ければ拒否する。全ページの `source_commit` と `reviewed_at` を null にする |
+| `report [--drift FILE]` | lint と drift の結果から audit の報告（ページごとの最悪の重大度、件数、次の操作）を組み立てる |
 | `status` | ページの状態の表示（7.4）。`--json` は他のコマンドの入力になる |
-| `plan` | sync の対象、HEAD、日付、警告を JSON で出す。判定は `status` と共通 |
+| `plan` | sync の対象、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
 | `lint` | 機械的な検査（7.5 の 1）。`--citations <id>` で、ページ内の全引用と引用先の実際の行を並べて出す（引用レンズが使う） |
 | `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する。本文ファイルが無いページ、HEAD の祖先でないコミット、正規の書式でないカタログは拒否する |
 | `stamp` | 7.6 |
-| `findings` | 未解決の指摘（10.2）を保存・表示・削除する。`findings save <id> <file>`（`-` で標準入力）、`findings show <id>`（本文のハッシュが一致しなければ破棄して `null`）、`findings clear <id>`。Workflow はファイルを書けないため、エージェントがこのコマンドで保存する |
+| `unverify --pages <id>...` | 書き直す前のページの `source_commit` を null に戻す。書き直しが検証を通らずに終わったページが「最新」に見えないようにするため、sync が対象のうち `source_commit` を持つページに対して最初に実行する |
+| `findings` | 未解決の指摘（10.2）を保存・表示・削除する。`findings save <id> <file>`（`-` で標準入力。`schemas/findings.schema.json` で検証する）、`findings show <id>`（本文のハッシュが一致しなければ破棄して `null`）、`findings clear <id>`。Workflow はファイルを書けないため、エージェントがこのコマンドで保存する |
 | `toc` | カタログから目次（`<wiki_dir>/README.md`）を生成し、`related` の相互リンクを双方向にし、各ページのフロントマターの `title` / `audience` / `updated` をカタログに揃える |
 | `post` | `post_commands` を実行する。ファイルの指定が無ければ何も実行しない。`{files}` を他の文字と連結した引数があれば、どのコマンドも実行せずに拒否する |
 
@@ -382,7 +391,7 @@ lint がこれらを前提に検査するため、設定では変えられない
 | カタログが無い（`sync` / `status` / `audit` / `stamp`） | `outline` を案内して止まる |
 | sources に未コミットの変更がある、または未追跡のファイルがある | 警告して続行する。`stamp` は拒否する |
 | ページ単位の失敗（エージェントの失敗、検証の全滅） | そのページを未検証のまま残し、他のページを続ける。最後に失敗したページの一覧を出す |
-| 検証エージェントが全滅したページ | 「検証済み・指摘なし」と区別するため、合成の blocker を立てて未検証のままにする |
+| 検証エージェントが全滅した、または一方のレンズしか終わらなかったページ | 「検証済み・指摘なし」と区別して未検証のまま残す。fix も、指摘の保存もしない（合成の指摘を保存すると、次の sync が無意味な fix から始まるため） |
 | `post_commands` の失敗 | Wiki のファイルが原因ならエージェントが直す（最大 3 回）。既存ファイルが原因なら直さずに報告する。Wiki 以外のファイルがフックの自動修正で変わった場合は元に戻す |
 
 ## 12. テストと受入検証

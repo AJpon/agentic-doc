@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agentic-doc write result",
+  "description": "What was written for one page (sync-write)",
+  "type": "object",
+  "required": [
+    "page_id",
+    "path",
+    "written"
+  ],
+  "properties": {
+    "page_id": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "written": {
+      "type": "boolean"
+    },
+    "headings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cited_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "diagram_count": {
+      "type": "integer"
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from adoc import catalogue, config, dates, gitutil, state
+from adoc import catalogue, config, dates, gitutil, state, workdir
 from adoc.cli import Command
 from adoc.state import State
 
@@ -44,8 +44,11 @@ def run(args: argparse.Namespace) -> int:
             targets.append({**p, "state": st.state.value, "reason": reason(st, explicit), "pending": st.pending})
         else:
             skipped.append({"id": p["id"], "state": st.state.value})
+    work = workdir.ensure_root(cfg)
     out = {
         "head": gitutil.head(cfg.root),
+        "wiki_dir": cfg.wiki_dir.relative_to(cfg.root).as_posix(),
+        "work_dir": work.relative_to(cfg.root).as_posix(),
         "today": args.today or dates.today(),
         "targets": targets,
         "skipped": skipped,

@@ -16,4 +16,4 @@ pythonpath = ["skills/wiki/scripts"]
 
 [tool.ruff]
 line-length = 120
-include = ["skills/**/*.py", "tests/**/*.py"]
+include = ["skills/**/*.py", "tests/**/*.py", "dev/**/*.py"]

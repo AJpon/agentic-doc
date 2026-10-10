@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agentic-doc drift result",
+  "description": "Whether a changed page still matches the code (audit-drift)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "page_id",
+    "issues"
+  ],
+  "properties": {
+    "page_id": {
+      "type": "string"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "required": [
+        "severity",
+        "location",
+        "problem",
+        "fix"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "blocker",
+            "major",
+            "minor"
+          ]
+        },
+        "location": {
+          "type": "string"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "fix": {
+          "type": "string"
+        },
+        "lens": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

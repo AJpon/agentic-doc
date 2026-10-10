@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agentic-doc verdict",
+  "description": "Findings of one verification lens (verify-citation, verify-claim)",
+  "type": "object",
+  "required": [
+    "lens",
+    "pass",
+    "issues"
+  ],
+  "properties": {
+    "lens": {
+      "type": "string",
+      "enum": [
+        "citation",
+        "claim"
+      ]
+    },
+    "pass": {
+      "type": "boolean"
+    },
+    "checked_count": {
+      "type": "integer"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "required": [
+        "severity",
+        "location",
+        "problem",
+        "fix"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "blocker",
+            "major",
+            "minor"
+          ]
+        },
+        "location": {
+          "type": "string"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "fix": {
+          "type": "string"
+        },
+        "lens": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
