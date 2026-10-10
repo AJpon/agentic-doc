@@ -21,3 +21,54 @@ jobs:
       - run: uv sync
       - run: uv run pytest
       - run: uv run ruff check .
+
+  # Python 本体も uv のキャッシュも無い状態から、導入先と同じ呼び出しで動くことを確かめる（仕様書 12 章）
+  first-run:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+      - name: Run the CLI with no Python and an empty uv cache
+        env:
+          UV_CACHE_DIR: ${{ runner.temp }}/first-run-cache
+          UV_PYTHON_INSTALL_DIR: ${{ runner.temp }}/first-run-python
+          UV_PYTHON_PREFERENCE: only-managed
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = Join-Path $PWD 'skills/wiki/scripts/agentic_doc.py'
+          $repo = Join-Path $env:RUNNER_TEMP 'first-run-repo'
+          New-Item -ItemType Directory -Path (Join-Path $repo 'src') -Force | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $repo 'docs/wiki') -Force | Out-Null
+          Set-Location $repo
+          function Write-Lf($path, $text) { [IO.File]::WriteAllText((Join-Path $repo $path), ($text -replace "`r`n", "`n")) }
+          function Invoke-Cli { uv run --script $script @args; if ($LASTEXITCODE -ne 0) { throw "exit ${LASTEXITCODE}: $args" } }
+          git init -q -b main
+          git config user.email t@example.com
+          git config user.name t
+          Write-Lf 'src/a.py' "print(1)`n"
+          Write-Lf '.agentic-doc.config.json' "{`"version`": 1}`n"
+          Write-Lf 'docs/wiki/catalogue.json' @'
+          {
+            "version": 1,
+            "chapters": [{"id": "g", "title": "G", "description": "d"}],
+            "pages": [{"id": "g/a", "path": "g/a.md", "title": "A", "audience": ["contributor"], "brief": "b",
+                       "sources": ["src/a.py"], "related": [], "source_commit": null, "reviewed_at": null}]
+          }
+          '@
+          git add -A
+          git commit -qm init
+          Invoke-Cli --help
+          Invoke-Cli config check
+          Invoke-Cli status
+          if (-not (Get-ChildItem $env:UV_PYTHON_INSTALL_DIR -ErrorAction SilentlyContinue)) {
+            throw 'uv did not install a managed Python; the run may have used a preinstalled one'
+          }
