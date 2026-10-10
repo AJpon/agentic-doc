@@ -1,4 +1,4 @@
-"""catalogue: カタログの検査（check）と設置（install）（仕様書 6 章、7.2）."""
+"""catalogue: カタログの検査（check）・設置（install）・旧形式からの変換（migrate）（仕様書 6 章、7.1、7.2）."""
 
 import argparse
 import json
@@ -24,6 +24,11 @@ def add_args(p: argparse.ArgumentParser) -> None:
     i = sub.add_parser("install", help="check FILE and install it as the catalogue (source_commit reset)")
     i.add_argument("file", metavar="FILE", help="catalogue to install")
     i.add_argument("--force", action="store_true", help="overwrite an existing catalogue")
+    m = sub.add_parser("migrate", help="convert an old-format catalogue (no chapters, e.g. _catalogue.json) and "
+                       "install it as the catalogue, keeping source_commit")
+    m.add_argument("file", metavar="FILE", help="old-format catalogue to convert (removed on success)")
+    m.add_argument("--force", action="store_true", help="overwrite an existing catalogue")
+    m.add_argument("--json", action="store_true", help="print the result as JSON")
 
 
 def _issue(severity: str, code: str, detail: str) -> dict:
@@ -110,9 +115,77 @@ def _print(issues: list[dict], as_json: bool) -> None:
         print("ok")
 
 
+def _readme_title(cfg: Config) -> str | None:
+    readme = cfg.wiki_dir / "README.md"
+    if not readme.is_file():
+        return None
+    for line in readme.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# ") and line[2:].strip():
+            return line[2:].strip()
+    return None
+
+
+def convert(cfg: Config, old: dict) -> tuple[dict, list[str]]:
+    """旧形式のカタログ（chapters 無し）を現行の形式に変換する。ページはそのまま保つ."""
+    if not isinstance(old, dict) or not isinstance(old.get("pages"), list):
+        raise Refused("not an old-format catalogue: no pages array")
+    warnings = []
+    lang = old.get("language")
+    if lang is not None and lang != cfg.language:
+        warnings.append(f"old catalogue language {lang} differs from the configured language {cfg.language}")
+    order: list[str] = []
+    for p in old["pages"]:
+        ch = str(p.get("id", "")).split("/")[0] if isinstance(p, dict) else ""
+        if ch and ch not in order:
+            order.append(ch)
+    data: dict = {"version": 1}
+    title = old.get("title") if isinstance(old.get("title"), str) else _readme_title(cfg)
+    if title:
+        data["title"] = title
+    data["chapters"] = [{"id": c, "title": c, "description": ""} for c in order]
+    data["pages"] = old["pages"]
+    return data, warnings
+
+
+def _migrate(cfg: Config, args: argparse.Namespace) -> int:
+    src = Path(args.file).resolve()
+    _, old = _read(src)
+    data, warnings = convert(cfg, old)
+    issues = check_data(cfg, data)
+    warnings += [f"{i['code']}: {i['detail']}" for i in issues if i["severity"] != "error"]
+    errors = [i for i in issues if i["severity"] == "error"]
+    if errors:
+        _print(errors, args.json)
+        return 1
+    with catalogue.locked(cfg):
+        if cfg.catalogue.exists() and not args.force:
+            raise Refused(f"catalogue already exists: {cfg.catalogue.relative_to(cfg.root).as_posix()} — pass --force "
+                          "to overwrite")
+        catalogue.replace(cfg, data)
+    if src != cfg.catalogue.resolve():
+        src.unlink()
+    out = {
+        "catalogue": cfg.catalogue.relative_to(cfg.root).as_posix(),
+        "chapters": len(data["chapters"]),
+        "pages": len(data["pages"]),
+        "warnings": warnings,
+        "next": "fill in each chapter's title and description in the catalogue",
+    }
+    if args.json:
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        return 0
+    print(f"{out['catalogue']}: {out['chapters']} chapters, {out['pages']} pages")
+    for w in warnings:
+        print(f"warning: {w}")
+    print(f"next: {out['next']}")
+    return 0
+
+
 def run(args: argparse.Namespace) -> int:
     cfg = config.load(Path.cwd())
     gitutil.ensure_repo(cfg.root)
+    if args.action == "migrate":
+        return _migrate(cfg, args)
     if args.action == "check":
         path = Path(args.file) if args.file else cfg.catalogue
         text, data = _read(path)
@@ -139,5 +212,5 @@ def run(args: argparse.Namespace) -> int:
     return 0
 
 
-COMMAND = Command(help="check a catalogue against the spec, or install one written by outline",
+COMMAND = Command(help="check a catalogue against the spec, install one written by outline, or migrate an old one",
                   add_args=add_args, run=run)

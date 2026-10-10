@@ -171,3 +171,84 @@ def test_check_missing_or_broken_file_is_2(good):
     assert run_cli(good.root, "catalogue", "check", "nope.json")[0] == 2
     good.write(WORK, "{not json")
     assert run_cli(good.root, "catalogue", "check", WORK)[0] == 2
+
+
+OLD = "docs/wiki/_catalogue.json"
+
+
+@pytest.fixture
+def legacy(wiki):
+    """wiki フィクスチャのカタログを、fbx-view の旧形式（chapters 無し、余分なキー付き）に置き換える."""
+    data = json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    wiki.write(OLD, dump({"version": 1, "language": "en", "citation_style": "local", "pages": data["pages"]}))
+    (wiki.root / "docs/wiki/catalogue.json").unlink()
+    wiki.commit()
+    return wiki
+
+
+def migrate(r, *extra) -> tuple[int, str, str]:
+    return run_cli(r.root, "catalogue", "migrate", OLD, *extra)
+
+
+def test_migrate_builds_chapters_from_ids(legacy):
+    code, _, err = migrate(legacy)
+    assert code == 0, err
+    data = json.loads((legacy.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    assert data["chapters"] == [{"id": "g", "title": "g", "description": ""}]
+    assert "language" not in data and "citation_style" not in data
+    assert run_cli(legacy.root, "catalogue", "check")[0] == 0
+
+
+def test_migrate_keeps_source_commit(wiki):
+    _, before, _ = run_cli(wiki.root, "status", "--json")
+    data = json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    wiki.write(OLD, dump({"version": 1, "language": "en", "pages": data["pages"]}))
+    (wiki.root / "docs/wiki/catalogue.json").unlink()
+    wiki.commit()
+    assert migrate(wiki)[0] == 0
+    wiki.commit()
+    _, after, _ = run_cli(wiki.root, "status", "--json")
+    state = lambda s: [(p["id"], p["state"]) for p in json.loads(s)["pages"]]
+    assert state(after) == state(before)
+    assert [p["source_commit"] for p in json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(
+        encoding="utf-8"))["pages"]] == [p["source_commit"] for p in data["pages"]]
+
+
+def test_migrate_takes_title_from_readme(legacy):
+    legacy.write("docs/wiki/README.md", "intro\n\n# My Wiki\n\n## Chapter\n")
+    assert migrate(legacy)[0] == 0
+    assert json.loads((legacy.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))["title"] == "My Wiki"
+
+
+def test_migrate_refuses_existing_without_force(legacy):
+    legacy.write("docs/wiki/catalogue.json", "keep\n")
+    code, _, err = migrate(legacy)
+    assert code == 2 and "already exists" in err
+    assert (legacy.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8") == "keep\n"
+    assert (legacy.root / OLD).exists()
+    assert migrate(legacy, "--force")[0] == 0
+
+
+def test_migrate_reports_errors_without_writing(legacy):
+    data = json.loads((legacy.root / OLD).read_text(encoding="utf-8"))
+    data["pages"][0]["related"] = ["g/nowhere"]
+    legacy.write(OLD, dump(data))
+    code, out, _ = migrate(legacy)
+    assert code == 1 and "related-unknown" in out
+    assert not (legacy.root / "docs/wiki/catalogue.json").exists()
+    assert (legacy.root / OLD).exists()
+
+
+def test_migrate_removes_old_file(legacy):
+    code, out, _ = migrate(legacy)
+    assert code == 0 and "docs/wiki/catalogue.json" in out
+    assert not (legacy.root / OLD).exists()
+
+
+def test_migrate_warns_language_mismatch(legacy):
+    legacy.config(language="ja")
+    code, out, _ = migrate(legacy, "--json")
+    result = json.loads(out)
+    assert code == 0
+    assert any("language" in w for w in result["warnings"])
+    assert result["chapters"] == 1 and result["pages"] == 2
