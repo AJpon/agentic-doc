@@ -65,8 +65,16 @@ def _split_z(out: str) -> list[str]:
 
 
 def ls_files(root: Path, globs: list[str], exclude: list[str]) -> list[str]:
-    """追跡済みファイルのうち globs にマッチし exclude にマッチしないもの."""
-    return _split_z(git(root, "ls-files", "-z", "--", *pathspecs(globs, exclude)).out)
+    """追跡済みファイルのうち globs にマッチし exclude にマッチしないもの.
+
+    除外は git に渡さず、除外の glob で列挙した集合を引く。git ls-files は、肯定の
+    pathspec が 1 ファイルだけで除外の pathspec があると、0 件を返すことがある（Apple Git 2.50）。
+    """
+    files = _split_z(git(root, "ls-files", "-z", "--", *pathspecs(globs, [])).out)
+    if not exclude or not files:
+        return files
+    excluded = set(_split_z(git(root, "ls-files", "-z", "--", *pathspecs(exclude, [])).out))
+    return [f for f in files if f not in excluded]
 
 
 def changed_since(root: Path, sha: str, globs: list[str], exclude: list[str]) -> list[str] | None:

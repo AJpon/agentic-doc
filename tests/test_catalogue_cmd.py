@@ -117,6 +117,15 @@ def test_source_glob_empty(good):
     assert_error(good, "source-glob-empty")
 
 
+def test_single_nested_source_with_exclude(good):
+    good.write("a/b/c.py", "m\n")
+    good.commit()
+    good.config(exclude=["zzz/**"])
+    mutate(good, lambda d: d["pages"][0].update(sources=["a/b/c.py"]))
+    code, found = check(good)
+    assert "source-glob-empty" not in found and code == 0
+
+
 def test_chapter_empty(good):
     mutate(good, lambda d: d["chapters"].append({"id": "c", "title": "C", "description": "d"}))
     code, found = check(good)
