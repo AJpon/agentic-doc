@@ -123,3 +123,19 @@ Claude Code で補足的に確かめたこと:
 - B は TypeScript で書ける点を除き、A に対する利点が見当たらない。deno 本体の 162 MB のダウンロードが初回の体験を損なう。
 
 Mermaid の構文検査は、Node と mermaid がある環境でだけ動く任意の検査とする（仕様書 8 章のとおり）。
+
+## 4. 計画 3 の実機確認（2026-10-10）
+
+環境: Claude Code（`claude -p --plugin-dir`）、macOS。小さな導入先（`src/calc/` の Python 6 本、1 章 1 ページのカタログ、`language: "ja"`）で確かめた。
+
+| 確かめたこと | 結果 |
+| --- | --- |
+| `/agentic-doc:wiki help` | `status` を実行し、「未生成 1 ページ、次は sync」と引数付きで案内した |
+| 入口スキルから Workflow `agentic-doc:wiki-run` を `args.plugin_root` 付きで起動できるか | はい。research → write → 2 レンズの verify → checkpoint → integrate まで通り、ページは「最新」になった。`lint` の指摘は 0 件 |
+| 中断からの再開 | 1 回目はセッションの利用上限（429）で write の後に止まった。ページは「未検証」のまま残り、2 回目の `sync` で処理し直して「最新」になった |
+
+分かったこと:
+
+- 入口スキルは Workflow をバックグラウンドで起動し、完了の通知を受けてから結果を報告した。`claude -p` でも、通知を待ってから終了した。
+- エージェントがソースを import して確かめたため、導入先に `__pycache__/` が残った（導入先の `.gitignore` で無視されていなければ未追跡ファイルになる）。
+- `checkpoint` が作業ディレクトリのページを消したあと、章の空ディレクトリ（`.agentic-doc/work/overview/`）が残る。git からは見えない。
