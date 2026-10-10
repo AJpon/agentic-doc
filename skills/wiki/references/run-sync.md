@@ -14,7 +14,7 @@ uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" plan --pages <id> <id>
 uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" plan --include-unresolved
 ```
 
-The JSON output contains `head`, `today`, `wiki_dir`, `work_dir`, `targets`, `skipped` and `warnings`.
+The JSON output contains `head`, `today`, `wiki_dir`, `work_dir`, `targets`, `target_count`, `skipped` and `warnings`.
 - If `warnings` lists uncommitted or untracked files, tell the user that the wiki will describe the committed state, and suggest committing first. Then continue.
 - If `targets` is empty, report that nothing needs to be done, and stop.
 
@@ -29,7 +29,7 @@ uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" unverify --pages <ids of th
 For each page in `targets`, do the following steps. If one page fails, record the failure and continue with the next page.
 
 1. **Resume from saved findings.** If `pending` is greater than 0, run the command below.
-   - If it prints an array, use the array as the round-1 findings and go straight to step 5.
+   - If it prints an array, skip steps 2–4 and start at step 5, using the array as the round-1 findings. The page counts as written: add its file to `written_files`.
    - If it prints `null`, continue with step 2.
 
    ```bash
@@ -63,9 +63,9 @@ For each page in `targets`, do the following steps. If one page fails, record th
 
 ## 3. Integrate
 
-If at least one page was written, follow `<SKILL_DIR>/references/sync-integrate.md`. Inputs:
+If at least one page was processed (its result is `verified`, `unresolved` or `unverified`), follow `<SKILL_DIR>/references/sync-integrate.md`. Inputs:
 - `pages`: every processed page, with its result (`verified`, `unresolved` or `unverified`).
-- `written_files`: the files you wrote.
+- `written_files`: the page files you wrote or fixed, relative to the repository root (`<wiki_dir>/<path>`).
 
 ## 4. Report
 

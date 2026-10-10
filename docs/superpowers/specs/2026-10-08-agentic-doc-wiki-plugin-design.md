@@ -330,7 +330,7 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | `catalogue migrate FILE [--force] [--json]` | 旧形式のカタログ（`chapters` が無い）を変換して設定の場所に置く。章はページ ID の前半から作り（`title` は ID、`description` は空）、カタログの `title` は `<wiki_dir>/README.md` の最初の H1 から採る。`source_commit` と `reviewed_at` は保つ。余分なトップレベルのキー（`language`、`citation_style`）は捨て、`language` が設定と違えば警告する。既存のカタログは `--force` が無ければ拒否する。成功したら元のファイルを消す |
 | `report [--drift FILE]` | lint と drift の結果から audit の報告（ページごとの最悪の重大度、件数、次の操作）を組み立てる |
 | `status` | ページの状態の表示（7.4）。`--json` は他のコマンドの入力になる |
-| `plan` | sync の対象、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
+| `plan` | sync の対象とその件数（`target_count`。Workflow が転記の欠落を検知する）、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
 | `lint` | 機械的な検査（7.5 の 1）。`--citations <id>` で、ページ内の全引用と引用先の実際の行を並べて出す（引用レンズが使う） |
 | `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する。本文ファイルが無いページ、HEAD の祖先でないコミット、正規の書式でないカタログは拒否する |
 | `stamp` | 7.6 |

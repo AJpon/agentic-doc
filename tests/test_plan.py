@@ -50,3 +50,9 @@ def test_plan_reports_dirs_and_ignores_workdir(five):
     d = plan(five)
     assert d["wiki_dir"] == "docs/wiki" and d["work_dir"] == ".agentic-doc/work"
     assert (five.root / ".agentic-doc/work/.gitignore").read_text(encoding="utf-8") == "*\n"
+
+
+def test_plan_reports_target_count(five):
+    code, out, _ = run_cli(five.root, "plan")
+    data = json.loads(out)
+    assert code == 0 and data["target_count"] == len(data["targets"]) == 3
