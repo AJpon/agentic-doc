@@ -139,7 +139,8 @@ def test_skill_frontmatter():
 def test_wiki_skill_routes_every_mode_and_both_harnesses():
     text = (WIKI / "SKILL.md").read_text(encoding="utf-8")
     for needle in ["agentic-doc:wiki-run", "${CLAUDE_PLUGIN_ROOT}", "run-outline.md", "run-sync.md", "run-audit.md",
-                   "overview.md", 'report --drift -', "config check", "wiki-setup"]:
+                   "overview.md", "report --drift .agentic-doc/work/drift.json",
+                   "config check", "wiki-setup"]:
         assert needle in text, needle
     assert text.count("${CLAUDE_PLUGIN_ROOT}") == 1
 
@@ -156,3 +157,11 @@ def test_setup_skill_points_to_wiki_scripts():
 def test_plugin_root_token_not_used():
     for p in (ROOT / "skills").rglob("*.md"):
         assert "${PLUGIN_ROOT}" not in p.read_text(encoding="utf-8"), p
+
+
+def test_no_stdin_piping_in_skill_docs():
+    # Windows PowerShell 5.1 はパイプで非 ASCII を壊すので、JSON はファイルで渡す
+    for doc in skill_docs():
+        text = doc.read_text(encoding="utf-8")
+        assert not re.search(r"agentic_doc\.py\"[^`\n]* -(\s|$|`)", text), doc
+        assert "Get-Content" not in text, doc

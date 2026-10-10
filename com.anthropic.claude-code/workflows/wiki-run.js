@@ -64,8 +64,8 @@ function cmd(...argv) {
   return ['uv run --script "' + SKILL_DIR + '/scripts/agentic_doc.py"'].concat(argv.map(quote)).join(' ')
 }
 
-async function runCommand(label, phaseName, command, stdin) {
-  const input = stdin === undefined ? { command } : { command, stdin }
+async function runCommand(label, phaseName, command, file) {
+  const input = file === undefined ? { command } : { command, file }
   return agent(task('step-command.md', input), {
     label,
     phase: phaseName,
@@ -124,11 +124,10 @@ async function runVerify(page) {
       )
     )
   ).filter(Boolean)
-  if (!verdicts.length) {
-    log(page.id + ': every verification agent failed; the page stays unverified')
+  if (verdicts.length < 2) {
+    log(page.id + ': only ' + verdicts.length + '/2 verification lenses finished; the page stays unverified')
     return null
   }
-  if (verdicts.length < 2) log(page.id + ': only ' + verdicts.length + '/2 verification lenses finished')
   return verdicts
 }
 
@@ -144,6 +143,16 @@ async function runSync() {
     return { mode: 'sync', head: plan.head, today: plan.today, pages: [], failed: [], skipped: plan.skipped || [], integrate: null }
   }
   log('targets (' + plan.targets.length + '): ' + plan.targets.map((t) => t.id).join(', '))
+
+  // A page being rewritten is unverified until it passes review again; otherwise a rewrite that ends with
+  // findings (or dies) would keep the old source_commit and still look fresh.
+  const verified = plan.targets.filter((t) => t.source_commit).map((t) => t.id)
+  if (verified.length) {
+    const r = await runCommand('unverify', 'Plan', cmd('unverify', '--pages', ...verified))
+    if (!r || r.exit_code !== 0) {
+      throw new Error('unverify failed' + (r ? ' (exit ' + r.exit_code + '): ' + r.stderr.trim() : ''))
+    }
+  }
 
   async function prepare(page) {
     if (page.pending > 0) {
@@ -182,7 +191,7 @@ async function runSync() {
 
   async function record(page, findings) {
     const r = findings.length
-      ? await runCommand('record:' + page.id, 'Record', cmd('findings', 'save', page.id, '-'), JSON.stringify(findings))
+      ? await runCommand('record:' + page.id, 'Record', cmd('findings', 'save', page.id, '<FILE>'), JSON.stringify(findings))
       : await runCommand('record:' + page.id, 'Record', cmd('checkpoint', '--pages', page.id, '--sha', plan.head, '--today', plan.today))
     if (!r || r.exit_code !== 0) {
       log(page.id + ': recording failed' + (r ? ' (exit ' + r.exit_code + '): ' + r.stderr.trim() : ''))

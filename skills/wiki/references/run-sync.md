@@ -18,6 +18,12 @@ The JSON output contains `head`, `today`, `wiki_dir`, `work_dir`, `targets`, `sk
 - If `warnings` lists uncommitted or untracked files, tell the user that the wiki will describe the committed state, and suggest committing first. Then continue.
 - If `targets` is empty, report that nothing needs to be done, and stop.
 
+Some targets may still have a `source_commit` (for example, pages named with `--pages`, or changed pages). Reset it before you rewrite them, so that a page whose rewrite fails stays unverified instead of looking fresh. If this command fails, stop:
+
+```bash
+uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" unverify --pages <ids of the targets whose source_commit is not null>
+```
+
 ## 2. Process each target in order
 
 For each page in `targets`, do the following steps. If one page fails, record the failure and continue with the next page.
@@ -47,13 +53,13 @@ For each page in `targets`, do the following steps. If one page fails, record th
      uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" checkpoint --pages <id> --sha <head> --today <today>
      ```
 
-   - Otherwise, save the remaining `blocker` and `major` issues as a JSON array on standard input. The next sync resumes from them.
+   - Otherwise, write the remaining `blocker` and `major` issues as a JSON array to `<work_dir>/<id>/findings-input.json`, using your file-writing tool, then save them. The next sync resumes from them.
 
      ```bash
-     uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" findings save <id> -
+     uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" findings save <id> <work_dir>/<id>/findings-input.json
      ```
 
-   - If you could not verify the page at all, record nothing. The page stays unverified.
+   - If either verification lens could not be completed, record nothing. The page stays unverified.
 
 ## 3. Integrate
 

@@ -141,8 +141,8 @@ def test_persistent_blocker_runs_two_fix_rounds_then_saves_findings():
     r = run_wf(SYNC, responses)
     assert labels(r).count("fix1:a/x") == 1 and labels(r).count("fix2:a/x") == 1
     rec = inputs(call(r, "record:a/x"))
-    assert rec["command"] == f"{SCRIPT} findings save a/x -"
-    assert json.loads(rec["stdin"]) == [{**BLOCKER, "lens": "claim"}]
+    assert rec["command"] == f"{SCRIPT} findings save a/x <FILE>"
+    assert json.loads(rec["file"]) == [{**BLOCKER, "lens": "claim"}]
     assert r["result"]["pages"][0]["result"] == "unresolved" and r["result"]["pages"][0]["findings"] == 1
 
 
@@ -278,3 +278,36 @@ def test_embedded_schemas_match_files():
     r = subprocess.run([sys.executable, "dev/embed_schemas.py", "--check"], cwd=ROOT, capture_output=True,
                        text=True, check=False)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_one_lens_missing_leaves_page_unverified():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("verify:citation:a/x"), None)]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert not any(label.startswith(("fix", "record")) for label in labels(r))
+    assert r["result"]["pages"][0]["result"] == "unverified"
+
+
+def test_verified_pages_are_unverified_before_rewrite():
+    t = target("a/x", state="fresh")
+    t["source_commit"] = "b" * 40
+    responses = [("^plan$", cmdres(ok_plan([t, target("a/y")]))), ("^integrate$", INTEGRATE),
+                 ("^unverify$", cmdres("a/x\n"))]
+    responses += page_responses("a/x") + page_responses("a/y")
+    r = run_wf({**SYNC, "pages": ["a/x", "a/y"]}, responses)
+    assert inputs(call(r, "unverify"))["command"] == f"{SCRIPT} unverify --pages a/x"
+    assert labels(r).index("unverify") < labels(r).index("research:a/x")
+
+
+def test_no_unverify_when_every_target_is_already_unverified():
+    r = run_wf(SYNC, clean_responses(["a/x"]))
+    assert "unverify" not in labels(r)
+
+
+def test_failed_unverify_throws():
+    t = target("a/x", state="changed")
+    t["source_commit"] = "b" * 40
+    r = run_wf(SYNC, [("^plan$", cmdres(ok_plan([t]))),
+                      ("^unverify$", {"exit_code": 2, "stdout": "", "stderr": "refused: locked"})])
+    assert "locked" in r["error"]

@@ -17,8 +17,8 @@ Read `<SKILL_DIR>/references/common.md` once first.
    ```
 
 3. For each of those pages in turn, read `<SKILL_DIR>/references/audit-drift.md` again and follow it with `page` set to the target. Keep each result. If you cannot finish a page, add its ID to a `failed` list.
-4. Combine the results into `{"results": [<drift results>], "failed": [<ids>]}`, pass the JSON on standard input to the following command, and show its output to the user:
+4. Combine the results into `{"results": [<drift results>], "failed": [<ids>]}`. Write the JSON to `.agentic-doc/work/drift.json` with your file-writing tool. Then run the following command, and show its output to the user:
 
    ```bash
-   uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" report --drift -
+   uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" report --drift .agentic-doc/work/drift.json
    ```

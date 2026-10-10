@@ -62,10 +62,12 @@ When the workflow returns, report the result:
   1. Show a table with one row per page: `id`, `result` and `findings`.
   2. List `failed`, and anything in `integrate.notes` or `integrate.broken_links_remaining`.
   3. Run `status`, and give the next step from its `Next:` line.
-- **audit**: Pass `{"results": <drift>, "failed": <drift_failed>}` as JSON on standard input to the command below, and show its output. With `--lint-only`, run `report` without `--drift`.
+- **audit**:
+  1. Write `{"results": <drift>, "failed": <drift_failed>}` as JSON to `.agentic-doc/work/drift.json` with your file-writing tool. Do not pipe it through the shell.
+  2. Run the command below, and show its output. With `--lint-only`, run `report` without `--drift`.
 
   ```bash
-  uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" report --drift -
+  uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" report --drift .agentic-doc/work/drift.json
   ```
 
 - **outline**:

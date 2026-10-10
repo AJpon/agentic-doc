@@ -27,6 +27,7 @@ from adoc import (
     cmd_stamp,
     cmd_status,
     cmd_toc,
+    cmd_unverify,
     lint,
 )
 from adoc.cli import Command
@@ -44,6 +45,7 @@ COMMANDS: dict[str, Command] = {
     "post": cmd_post.COMMAND,
     "catalogue": cmd_catalogue.COMMAND,
     "report": cmd_report.COMMAND,
+    "unverify": cmd_unverify.COMMAND,
 }
 
 
