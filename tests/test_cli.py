@@ -32,3 +32,17 @@ def test_runs_under_uv_script_ignoring_target_project(tmp_path):
     (tmp_path / "uv.toml").write_text('index-url = "http://127.0.0.1:9/"\n')
     r = subprocess.run(["uv", "run", "--script", str(SCRIPT), "--help"], cwd=tmp_path, capture_output=True, text=True, check=False)
     assert r.returncode == 0, r.stderr
+
+
+def test_cli_does_not_write_bytecode(tmp_path, repo):
+    import shutil
+    import subprocess
+    import sys
+
+    from conftest import SCRIPT
+
+    scripts = tmp_path / "plugin" / "scripts"
+    shutil.copytree(SCRIPT.parent, scripts, ignore=shutil.ignore_patterns("__pycache__"))
+    subprocess.run([sys.executable, str(scripts / "agentic_doc.py"), "--help"], cwd=repo.root,
+                   capture_output=True, check=True, env={**__import__("os").environ, "PYTHONDONTWRITEBYTECODE": ""})
+    assert not list(scripts.rglob("__pycache__"))

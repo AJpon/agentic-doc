@@ -51,6 +51,7 @@ def run(args: argparse.Namespace) -> int:
         "work_dir": work.relative_to(cfg.root).as_posix(),
         "today": args.today or dates.today(),
         "targets": targets,
+        "target_count": len(targets),
         "skipped": skipped,
         "warnings": state.warnings(cfg, data["pages"]),
     }

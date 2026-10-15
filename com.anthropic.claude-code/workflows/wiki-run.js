@@ -86,6 +86,11 @@ async function runPlan(planArgs) {
   }
   if (!/^[0-9a-f]{40}$/.test(plan.head || '')) throw new Error('plan.head is not a 40-digit SHA: ' + plan.head)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(plan.today || '')) throw new Error('plan.today is not YYYY-MM-DD: ' + plan.today)
+  // The plan output is transcribed by an agent; a dropped target would silently go unprocessed.
+  if (!Array.isArray(plan.targets) || plan.targets.length !== plan.target_count) {
+    throw new Error('plan transcription is incomplete: ' + (Array.isArray(plan.targets) ? plan.targets.length : 'no') +
+      ' targets, target_count ' + plan.target_count)
+  }
   const w = plan.warnings || {}
   if ((w.uncommitted || []).length) log('warning: uncommitted changes in sources: ' + w.uncommitted.join(', '))
   if ((w.untracked || []).length) log('warning: untracked files in sources: ' + w.untracked.join(', '))
@@ -204,7 +209,8 @@ async function runSync() {
     const result = (kind, findings, disputed) => ({
       id: page.id,
       path: page.path,
-      written: ctx.written || null,
+      // A page resumed from saved findings is rewritten by fix, so it also goes to post_commands.
+      written: ctx.written || (ctx.resume ? plan.wiki_dir + '/' + page.path : null),
       result: kind,
       findings: findings.length,
       disputed,

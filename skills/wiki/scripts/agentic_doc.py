@@ -14,6 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True  # 導入先やプラグインのキャッシュに __pycache__ を残さない
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from adoc import (

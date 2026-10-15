@@ -71,4 +71,12 @@ Write only the keys whose value differs from the default, and always write `vers
    ```
 
    Pages with `source-glob-empty` (a sources glob now matches nothing) or `cite-excluded` (a citation points into an excluded file) need attention. Suggest `sync --pages <ids>`, or `outline --force` if many pages are affected.
-4. If no file exists at the `catalogue` path, look for one at the default path or at the old name `<wiki_dir>/_catalogue.json`. If you find one, offer the user two choices: move the file, or point `catalogue` at it. Do what the user chooses.
+4. If no file exists at the `catalogue` path, look for one at the default path or at the old name `<wiki_dir>/_catalogue.json`.
+   - A file in the current format (it has `chapters`): offer the user two choices, move the file or point `catalogue` at it. Do what the user chooses.
+   - A file in the old format (no `chapters`, for example the `_catalogue.json` of the original wiki workflow): offer to convert it. On approval, run the command below. It writes the catalogue to the `catalogue` path, keeps every `source_commit`, and removes the old file. If it exits with 1, show the issues and stop.
+
+     ```bash
+     uv run --script "<SKILL_DIR>/../wiki/scripts/agentic_doc.py" catalogue migrate "<path of the old file>"
+     ```
+
+     The converted chapters use their IDs as titles and have empty descriptions. Propose a `title` and a `description` for each chapter, taken from the chapter headings of the existing `<wiki_dir>/README.md` where possible, and write them into the catalogue after the user approves. Then run `catalogue check`, and `toc` to regenerate the table of contents.

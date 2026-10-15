@@ -64,7 +64,8 @@ def target(pid: str, pending: int = 0, state: str = "missing") -> dict:
 
 def ok_plan(targets: list[dict]) -> str:
     return json.dumps({"head": HEAD, "today": TODAY, "wiki_dir": "docs/wiki", "work_dir": ".agentic-doc/work",
-                       "targets": targets, "skipped": [], "warnings": {"uncommitted": [], "untracked": []}})
+                       "targets": targets, "target_count": len(targets), "skipped": [],
+                       "warnings": {"uncommitted": [], "untracked": []}})
 
 
 def research(pid: str) -> dict:
@@ -191,6 +192,14 @@ def test_pending_findings_skip_research_and_write():
     assert r["result"]["pages"][0]["result"] == "verified"
 
 
+def test_resumed_page_reaches_post_commands():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x", pending=1, state="unverified")]))),
+                 ("^integrate$", INTEGRATE), (lab("findings:a/x"), cmdres(json.dumps([BLOCKER])))]
+    responses += page_responses("a/x", research_ok=False)
+    r = run_wf(SYNC, responses)
+    assert inputs(call(r, "integrate"))["written_files"] == ["docs/wiki/a/x.md"]
+
+
 def test_stale_pending_findings_fall_back_to_research():
     responses = [("^plan$", cmdres(ok_plan([target("a/x", pending=1, state="unverified")]))),
                  ("^integrate$", INTEGRATE), (lab("findings:a/x"), cmdres("null"))]
@@ -213,6 +222,12 @@ def test_at_most_two_pages_in_flight():
 def test_bad_head_throws():
     bad = json.dumps({**json.loads(ok_plan([])), "head": "HEAD"})
     assert "head" in run_wf(SYNC, [("^plan$", cmdres(bad))])["error"]
+
+
+def test_truncated_plan_transcription_throws():
+    short = json.dumps({**json.loads(ok_plan([target("a/x")])), "target_count": 2})
+    r = run_wf(SYNC, [("^plan$", cmdres(short))])
+    assert "target_count" in r["error"]
 
 
 def test_failed_plan_throws_with_stderr():

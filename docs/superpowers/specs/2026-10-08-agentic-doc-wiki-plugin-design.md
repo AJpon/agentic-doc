@@ -192,7 +192,7 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 }
 ```
 
-- `id` は `章/ページ` 形式。章の部分は `chapters[].id` のどれかと一致する。
+- `id` は `章/ページ` 形式。章の部分は `chapters[].id` のどれかと一致する。章 ID とページ ID の各部分は小文字の英字・数字・ハイフンで、英字か数字で始まる。`chapters[].id` は重複させない。
 - `path` は `<id>.md` と完全に一致させる。連番の接頭辞は付けない。
 - `pages` 配列の並び順が読む順序の正である。
 - 章は最大 6、1 章あたりのページは最大 8、全ページ数は `max_pages` 以下。
@@ -240,7 +240,7 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 1. 初回の 1〜2 をやり直し、現状との差分だけを提案する（例: 新しい生成物ディレクトリが `exclude` に無い、`file` の指す先が消えた、フォーマッタが変わった）。
 2. 承認された項目だけを書き換え、`config check` を通す。
 3. `exclude` が変わった場合は、除外したファイルを `sources` に持つページを示し、そのページの再生成か `outline` の見直しを勧める。
-4. 設定の `catalogue` が指す先にファイルが無く、既定の場所や旧名（`_catalogue.json`）に見つかった場合は、設定の書き換えかファイルの移動を提案する。
+4. 設定の `catalogue` が指す先にファイルが無く、既定の場所や旧名（`_catalogue.json`）に見つかった場合は、設定の書き換えかファイルの移動を提案する。見つかったのが旧形式（`chapters` が無い。元実装のカタログ）なら、`catalogue migrate` での変換を提案し、変換後に章の `title` と `description` を既存の目次から埋める案を示す。
 
 ### 7.2 outline
 
@@ -327,9 +327,10 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | `config show` | 既定値を補った設定、`context` / `instructions` の本文（`file` は毎回読む）、言語ごとの固定の文字列（`strings`）を JSON で出す。全フェーズのエージェントが最初に読む |
 | `catalogue check [FILE]` | カタログを 6 章の制約（ID と path、章とページの上限、audience、related、sources の 0 件マッチなど）で検査する。FILE を省くと設定のカタログを検査し、書式も確かめる |
 | `catalogue install FILE [--force]` | 検査を通ったカタログを設定の場所に置く。既存のカタログは `--force` が無ければ拒否する。全ページの `source_commit` と `reviewed_at` を null にする |
+| `catalogue migrate FILE [--force] [--json]` | 旧形式のカタログ（`chapters` が無い）を変換して設定の場所に置く。章はページ ID の前半から作り（`title` は ID、`description` は空）、カタログの `title` は `<wiki_dir>/README.md` の最初の H1 から採る。`source_commit` と `reviewed_at` は保つ。余分なトップレベルのキー（`language`、`citation_style`）は捨て、`language` が設定と違えば警告する。既存のカタログは `--force` が無ければ拒否する。成功したら元のファイルを消す |
 | `report [--drift FILE]` | lint と drift の結果から audit の報告（ページごとの最悪の重大度、件数、次の操作）を組み立てる |
 | `status` | ページの状態の表示（7.4）。`--json` は他のコマンドの入力になる |
-| `plan` | sync の対象、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
+| `plan` | sync の対象とその件数（`target_count`。Workflow が転記の欠落を検知する）、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
 | `lint` | 機械的な検査（7.5 の 1）。`--citations <id>` で、ページ内の全引用と引用先の実際の行を並べて出す（引用レンズが使う） |
 | `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する。本文ファイルが無いページ、HEAD の祖先でないコミット、正規の書式でないカタログは拒否する |
 | `stamp` | 7.6 |
@@ -414,7 +415,7 @@ lint がこれらを前提に検査するため、設定では変えられない
 | （初回実行） | Python 本体も uv のキャッシュも無い環境で、初回の実行が通る |
 | （配布経路） | Codex で、このリポジトリの `marketplace.json`（`source: "./"`）からインストールして動く。Claude Code で、git のマーケットプレイスからインストールしてキャッシュに置かれた状態で動く |
 
-**fbx-view の移行**: `_catalogue.json` を `catalogue.json` にリネームし、設定ファイルを作る。setup の更新フロー（7.1 の 4）で扱える。
+**fbx-view の移行**: 設定ファイルを作り、`_catalogue.json`（`chapters` が無く、`language` と `citation_style` を持つ旧形式）を `catalogue migrate` で `catalogue.json` に変換する。setup の更新フロー（7.1 の 4）で扱える。
 
 ## 13. 既存資産の扱い
 
