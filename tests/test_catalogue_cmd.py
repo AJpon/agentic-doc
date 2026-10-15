@@ -245,6 +245,19 @@ def test_migrate_removes_old_file(legacy):
     assert not (legacy.root / OLD).exists()
 
 
+def test_migrate_warns_when_sources_hit_only_excluded_files(legacy):
+    legacy.write("vendor/x.py", "x\n")
+    data = json.loads((legacy.root / OLD).read_text(encoding="utf-8"))
+    data["pages"][0]["sources"] = ["vendor/*.py"]
+    legacy.write(OLD, dump(data))
+    legacy.config(exclude=["vendor/**"])
+    legacy.commit()
+    code, out, _ = migrate(legacy, "--json")
+    assert code == 0, out
+    assert any("source-glob-empty" in w for w in json.loads(out)["warnings"])
+    assert (legacy.root / "docs/wiki/catalogue.json").exists()
+
+
 def test_migrate_warns_language_mismatch(legacy):
     legacy.config(language="ja")
     code, out, _ = migrate(legacy, "--json")

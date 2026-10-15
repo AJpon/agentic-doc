@@ -162,8 +162,10 @@ def _migrate(cfg: Config, args: argparse.Namespace) -> int:
     _, old = _read(src)
     data, warnings = convert(cfg, old)
     issues = check_data(cfg, data)
-    warnings += [f"{i['code']}: {i['detail']}" for i in issues if i["severity"] != "error"]
-    errors = [i for i in issues if i["severity"] == "error"]
+    # 旧カタログの sources は、今の exclude で全部除外されていることがある。変換は内容を変えないので、警告に留める
+    soft = [i for i in issues if i["severity"] != "error" or i["code"] == "source-glob-empty"]
+    warnings += [f"{i['code']}: {i['detail']}" for i in soft]
+    errors = [i for i in issues if i not in soft]
     if errors:
         _print(errors, args.json)
         return 1
