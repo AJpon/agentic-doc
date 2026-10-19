@@ -18,6 +18,7 @@ sys.dont_write_bytecode = True  # 導入先やプラグインのキャッシュ�
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from adoc import (
+    cmd_cache,
     cmd_catalogue,
     cmd_checkpoint,
     cmd_config,
@@ -41,6 +42,7 @@ COMMANDS: dict[str, Command] = {
     "checkpoint": cmd_checkpoint.COMMAND,
     "stamp": cmd_stamp.COMMAND,
     "findings": cmd_findings.COMMAND,
+    "cache": cmd_cache.COMMAND,
     "lint": lint.COMMAND,
     "toc": cmd_toc.COMMAND,
     "post": cmd_post.COMMAND,

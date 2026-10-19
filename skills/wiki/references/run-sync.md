@@ -29,24 +29,36 @@ uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" unverify --pages <ids of th
 For each page in `targets`, do the following steps. If one page fails, record the failure and continue with the next page.
 
 1. **Resume from saved findings.** If `pending` is greater than 0, run the command below.
-   - If it prints an array, skip steps 2–4 and start at step 5, using the array as the round-1 findings. The page counts as written: add its file to `written_files`.
+   - If it prints an array, skip steps 2–5 and start at step 6, using the array as the round-1 findings. The page counts as written: add its file to `written_files`.
    - If it prints `null`, continue with step 2.
 
    ```bash
    uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" findings show <id>
    ```
 
-2. **Research.** Follow `<SKILL_DIR>/references/sync-research.md`. Inputs: `page` (the target) and `note_path` = `<work_dir>/<id>/research.md`.
-3. **Write.** Follow `<SKILL_DIR>/references/sync-write.md`. Inputs: `page`, `research`, and `today` from the plan.
-4. **Verify.**
+2. **Use the cache.** Each target has `cache` in the plan output. It is valid only while the page's `brief` and the contents of its source files are unchanged.
+   - If `cache.written.hit` is true, the page body from the interrupted run is still valid. Skip steps 3–4 and start at step 5 (verify). Add the page file to `written_files`.
+   - If `cache.research.hit` is true, skip step 3. Use `cache.research.path` as `research_path` and `cache.research.note_path` as `note_path` in step 4.
+3. **Research.** Follow `<SKILL_DIR>/references/sync-research.md`. Inputs: `page` (the target) and `note_path` = `<work_dir>/<id>/research.md`. When you finish, record it. If this command refuses, the research result is not usable: record the failure and continue with the next page.
+
+   ```bash
+   uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" cache save research <id>
+   ```
+
+4. **Write.** Follow `<SKILL_DIR>/references/sync-write.md`. Inputs: `page`, `research_path` (`<work_dir>/<id>/research.json`), `note_path`, and `today` from the plan. When you finish, and after every fix round in step 6, record the page body. If this command fails, continue anyway.
+
+   ```bash
+   uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" cache save written <id>
+   ```
+5. **Verify.**
    1. Follow `<SKILL_DIR>/references/verify-citation.md`.
    2. Read `<SKILL_DIR>/references/verify-claim.md` again, and follow it.
 
    While verifying, you are a verifier, not the author: try to prove the page wrong. Do not edit the page in this step.
-5. **Fix.**
-   - If the verdicts contain `blocker` or `major` issues, follow `<SKILL_DIR>/references/sync-fix.md`, with `round` 1, then verify again as in step 4.
+6. **Fix.**
+   - If the verdicts contain `blocker` or `major` issues, follow `<SKILL_DIR>/references/sync-fix.md`, with `round` 1, then verify again as in step 5.
    - If such issues remain, fix with `round` 2, then verify once more. Do not do more than 2 rounds.
-6. **Record.**
+7. **Record.**
    - If no `blocker` or `major` issue remains:
 
      ```bash

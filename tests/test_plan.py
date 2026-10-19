@@ -56,3 +56,16 @@ def test_plan_reports_target_count(five):
     code, out, _ = run_cli(five.root, "plan")
     data = json.loads(out)
     assert code == 0 and data["target_count"] == len(data["targets"]) == 3
+
+
+def test_plan_targets_carry_cache_state(five):
+    work = ".agentic-doc/work/g/unverified"
+    five.write(f"{work}/research.md", "notes\n")
+    five.write(f"{work}/research.json", json.dumps({"page_id": "g/unverified", "note_path": f"{work}/research.md",
+                                                     "key_claims": []}))
+    assert run_cli(five.root, "cache", "save", "research", "g/unverified")[0] == 0
+    targets = {t["id"]: t for t in plan(five)["targets"]}
+    assert targets["g/unverified"]["cache"]["research"]["hit"] is True
+    assert targets["g/unverified"]["cache"]["research"]["path"] == f"{work}/research.json"
+    assert targets["g/unverified"]["cache"]["written"] == {"hit": False}
+    assert targets["g/missing"]["cache"] == {"research": {"hit": False}, "written": {"hit": False}}

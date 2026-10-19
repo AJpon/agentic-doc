@@ -60,7 +60,7 @@ def load(cfg: Config, page_id: str, page_text: str) -> list[dict] | None:
     """保存された指摘。無ければ None。本文が変わっていれば破棄して None."""
     findings, ok = _read(cfg, page_id, page_text)
     if not ok:
-        clear(cfg, page_id)
+        findings_path(cfg, page_id).unlink(missing_ok=True)  # research のキャッシュは残す
     return findings
 
 

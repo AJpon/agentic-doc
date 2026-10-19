@@ -62,6 +62,12 @@ def target(pid: str, pending: int = 0, state: str = "missing") -> dict:
             "pending": pending}
 
 
+def cached(t: dict, research: bool = True, written: bool = False) -> dict:
+    pid = t["id"]
+    hit = {"hit": True, "path": f".agentic-doc/work/{pid}/research.json", "note_path": f".agentic-doc/work/{pid}/research.md"}
+    return {**t, "cache": {"research": hit if research else {"hit": False}, "written": {"hit": written}}}
+
+
 def ok_plan(targets: list[dict]) -> str:
     return json.dumps({"head": HEAD, "today": TODAY, "wiki_dir": "docs/wiki", "work_dir": ".agentic-doc/work",
                        "targets": targets, "target_count": len(targets), "skipped": [],
@@ -86,6 +92,7 @@ def page_responses(pid: str, dead=frozenset(), claim=None, research_ok=True) -> 
         (lab(f"verify:claim:{pid}"), None if "verify" in dead else (claim or verdict("claim"))),
         (lab(f"record:{pid}"), cmdres("")),
         (f"^fix[12]:{re.escape(pid)}$", {"changed": ["x"], "disputed": []}),
+        (f"^cache:(research|written):{re.escape(pid)}", cmdres("")),
     ]
     if research_ok:
         out += [(lab(f"research:{pid}"), None if f"research:{pid}" in dead else research(pid)),
@@ -326,3 +333,68 @@ def test_failed_unverify_throws():
     r = run_wf(SYNC, [("^plan$", cmdres(ok_plan([t]))),
                       ("^unverify$", {"exit_code": 2, "stdout": "", "stderr": "refused: locked"})])
     assert "locked" in r["error"]
+
+
+def test_fresh_research_is_saved_before_write():
+    r = run_wf(SYNC, clean_responses(["a/x"]))
+    save = call(r, "cache:research:a/x")
+    assert inputs(save)["command"] == f"{SCRIPT} cache save research a/x"
+    assert labels(r).index("research:a/x") < labels(r).index("cache:research:a/x") < labels(r).index("write:a/x")
+    w = inputs(call(r, "write:a/x"))
+    assert w["research_path"] == ".agentic-doc/work/a/x/research.json"
+    assert w["note_path"] == ".agentic-doc/work/a/x/research.md" and "research" not in w
+
+
+def test_failed_research_cache_save_fails_the_page():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("cache:research:a/x"), cmdres("", 2))]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert r["result"]["failed"] == ["a/x"] and "write:a/x" not in labels(r)
+
+
+def test_cached_research_skips_the_research_agent():
+    responses = [("^plan$", cmdres(ok_plan([cached(target("a/x"))]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", research_ok=False) + [(lab("write:a/x"), written("a/x"))]
+    r = run_wf(SYNC, responses)
+    assert "research:a/x" not in labels(r) and "cache:research:a/x" not in labels(r)
+    w = inputs(call(r, "write:a/x"))
+    assert w["research_path"] == ".agentic-doc/work/a/x/research.json"
+    assert w["note_path"] == ".agentic-doc/work/a/x/research.md"
+    assert r["result"]["pages"][0]["result"] == "verified"
+
+
+def test_written_page_goes_straight_to_verify():
+    t = cached(target("a/x", state="unverified"), written=True)
+    responses = [("^plan$", cmdres(ok_plan([t]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", research_ok=False)
+    r = run_wf(SYNC, responses)
+    assert not any(label in labels(r) for label in ("research:a/x", "write:a/x"))
+    assert "verify:citation:a/x" in labels(r) and r["result"]["pages"][0]["result"] == "verified"
+    assert inputs(call(r, "integrate"))["written_files"] == ["docs/wiki/a/x.md"]
+
+
+def test_written_page_fix_gets_the_cached_note():
+    t = cached(target("a/x", state="unverified"), written=True)
+    responses = [("^plan$", cmdres(ok_plan([t]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", research_ok=False, claim=verdict("claim", [BLOCKER]))
+    r = run_wf(SYNC, responses)
+    assert inputs(call(r, "fix1:a/x"))["note_path"] == ".agentic-doc/work/a/x/research.md"
+
+
+def test_written_cache_is_saved_after_write_and_after_each_fix():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", claim=verdict("claim", [BLOCKER]))
+    r = run_wf(SYNC, responses)
+    seq = [label for label in labels(r) if label.startswith(("write:", "fix", "cache:written"))]
+    assert seq == ["write:a/x", "cache:written:a/x", "fix1:a/x", "cache:written:a/x", "fix2:a/x",
+                   "cache:written:a/x"]
+    assert inputs(call(r, "cache:written:a/x"))["command"] == f"{SCRIPT} cache save written a/x"
+
+
+def test_failed_written_cache_save_is_not_fatal():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("cache:written:a/x"), cmdres("", 2))]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert r["result"]["pages"][0]["result"] == "verified"

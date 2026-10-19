@@ -39,7 +39,7 @@ History rewritten:   status shows "unresolved" ─▶ check the pages ─▶ sta
 | State | Condition | What to do |
 | --- | --- | --- |
 | `missing` | The page file does not exist | `sync` |
-| `unverified` | `source_commit` is null: the page was never verified, a rewrite has not passed review yet, or findings remain | `sync`. It resumes from the saved findings. |
+| `unverified` | `source_commit` is null: the page was never verified, a rewrite has not passed review yet, or findings remain | `sync`. It resumes from the saved findings, or reuses the cached research and the written page when they are still valid. |
 | `unresolved` | `source_commit` no longer exists, for example after a squash merge or rebase | Check the page, then run `stamp --pages <id>`, or `sync --pages <id>` |
 | `changed` | The sources changed after `source_commit` | `sync`. Run `audit` first if you want to know whether the text is still right. |
 | `fresh` | None of the above | Nothing |

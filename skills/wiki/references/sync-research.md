@@ -26,7 +26,9 @@ Gather the facts that the writer needs to answer the page's question. Do not wri
    - The values of the constants.
    - The relationships that are worth a diagram.
 
-You may write only `note_path`.
+7. Write the result you will return (see Output) as JSON to `research.json`, in the same directory as `note_path`. The workflow saves it with `cache save research`, which checks it against the schema. After an interruption, the next sync reuses the notes and this file instead of researching again.
+
+You may write only `note_path` and `research.json` beside it.
 
 ## Output
 

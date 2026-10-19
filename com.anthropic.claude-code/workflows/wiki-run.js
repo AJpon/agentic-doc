@@ -159,6 +159,15 @@ async function runSync() {
     }
   }
 
+  // Research is the heaviest step, so a result that is still valid (same brief and same source contents)
+  // is reused after an interruption. `plan` reports it per target in page.cache.
+  async function saveCache(kind, page) {
+    const r = await runCommand('cache:' + kind + ':' + page.id, 'Record', cmd('cache', 'save', kind, page.id))
+    if (r && r.exit_code === 0) return true
+    log(page.id + ': caching the ' + kind + ' result failed' + (r ? ' (exit ' + r.exit_code + '): ' + r.stderr.trim() : ''))
+    return false
+  }
+
   async function prepare(page) {
     if (page.pending > 0) {
       const r = await runCommand('findings:' + page.id, 'Research', cmd('findings', 'show', page.id))
@@ -173,6 +182,16 @@ async function runSync() {
         return { resume: saved }
       }
     }
+    const hit = page.cache || {}
+    const researchHit = hit.research && hit.research.hit ? hit.research : null
+    if (researchHit && hit.written && hit.written.hit) {
+      log(page.id + ': the written page is still valid; going straight to verification')
+      return { rewritten: true, notePath: researchHit.note_path }
+    }
+    if (researchHit) {
+      log(page.id + ': reusing the cached research')
+      return { researchPath: researchHit.path, notePath: researchHit.note_path }
+    }
     const notePath = plan.work_dir + '/' + page.id + '/research.md'
     const research = await agent(task('sync-research.md', { page, note_path: notePath }), {
       label: 'research:' + page.id,
@@ -180,17 +199,19 @@ async function runSync() {
       schema: SCHEMAS.research,
     })
     if (!research) throw new Error('research failed: ' + page.id)
-    return { research, notePath }
+    if (!(await saveCache('research', page))) throw new Error('research result is not usable: ' + page.id)
+    return { researchPath: plan.work_dir + '/' + page.id + '/research.json', notePath }
   }
 
   async function write(ctx, page) {
-    if (ctx.resume) return ctx
-    const w = await agent(task('sync-write.md', { page, research: ctx.research, today: plan.today }), {
+    if (ctx.resume || ctx.rewritten) return ctx
+    const w = await agent(task('sync-write.md', { page, research_path: ctx.researchPath, note_path: ctx.notePath, today: plan.today }), {
       label: 'write:' + page.id,
       phase: 'Write',
       schema: SCHEMAS.write,
     })
     if (!w || w.written === false) throw new Error('write failed: ' + page.id)
+    await saveCache('written', page)
     return { ...ctx, written: w.path }
   }
 
@@ -210,7 +231,7 @@ async function runSync() {
       id: page.id,
       path: page.path,
       // A page resumed from saved findings is rewritten by fix, so it also goes to post_commands.
-      written: ctx.written || (ctx.resume ? plan.wiki_dir + '/' + page.path : null),
+      written: ctx.written || (ctx.resume || ctx.rewritten ? plan.wiki_dir + '/' + page.path : null),
       result: kind,
       findings: findings.length,
       disputed,
@@ -235,6 +256,7 @@ async function runSync() {
       })
       if (!fixed) log(page.id + ': the fix agent failed (round ' + round + ')')
       else disputed.push(...(fixed.disputed || []))
+      await saveCache('written', page)
       const verdicts = await runVerify(page)
       if (!verdicts) return result('unverified', [], disputed)
       findings = blocking(verdicts)
