@@ -101,6 +101,13 @@ def test_written_invalidated_by_source_change(five):
     assert show(five)["written"]["hit"] is False
 
 
+def test_page_without_a_body_is_never_a_written_hit(five):
+    (five.root / "docs/wiki/g/unverified.md").unlink()
+    save_research(five)
+    assert show(five) == {"research": {"hit": True, "path": f"{WORK}/research.json",
+                                       "note_path": f"{WORK}/research.md"}, "written": {"hit": False}}
+
+
 def test_checkpoint_clears_the_cache(five):
     save_research(five)
     run_cli(five.root, "cache", "save", "written", PAGE)

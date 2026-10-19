@@ -110,6 +110,7 @@ def show(cfg: Config, page: dict) -> dict:
     if path.is_file() and note.is_file() and keys.get("research") == research_key(cfg, page):
         out["research"] = {"hit": True, "path": path.relative_to(root).as_posix(),
                            "note_path": note.relative_to(root).as_posix()}
-        if keys.get("written") == written_key(cfg, page):
+        written = written_key(cfg, page)
+        if written is not None and keys.get("written") == written:
             out["written"] = {"hit": True}
     return out
