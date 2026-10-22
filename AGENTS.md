@@ -14,7 +14,7 @@ This file provides guidance to AI agents when working with code in this reposito
 | --- | --- |
 | `docs/superpowers/specs/2026-10-08-agentic-doc-wiki-plugin-design.md` | 設計仕様。設定ファイル、カタログ、モード、スクリプト、執筆規約、エラー処理はすべてここが正 |
 | `docs/superpowers/research/2026-10-08-runtime-and-harness-probes.md` | 実行方式とハーネスの検証記録。冒頭の「未確認」は検証済みと扱わない |
-| `docs/superpowers/plans/` | 実装計画。計画 1（土台づくり）、計画 2（決定的なスクリプト群）、計画 3（スキル・参照文書・Workflow）は完了済み。計画 4（受入検証）はこれから |
+| `docs/superpowers/plans/` | 実装計画。計画 1（土台づくり）〜計画 3（スキル・参照文書・Workflow）は完了済み。計画 4（受入検証、`catalogue migrate`、`cache`）は Copilot と Windows の実機の結果待ち（`docs/superpowers/acceptance/` の手順書） |
 
 ## 構成
 
@@ -38,6 +38,7 @@ tests/workflow_harness.mjs           # wiki-run.js を agent() のスタブで�
 - スキル本文からスクリプトや参照文書を指すときは「この SKILL.md と同じディレクトリからの相対パス」で書き、パスはダブルクォートで囲む。`${PLUGIN_ROOT}` はスキル本文では展開されないので使わない。
 - Workflow はファイルシステムに触れず、日付も取れない。プラグインのパスと日付は、入口スキルが `args.plugin_root`（`${CLAUDE_PLUGIN_ROOT}`）と `args.today` で渡す。Workflow の `meta.name` はスキルと同じ名前にしない。
 - スクリプトは uv + PEP 723 の Python。導入先に要求する前提は uv と git だけ。
+- `sync` を試すクローンは `.claude` の外に置く。`.claude` の下だと、Write が `docs/wiki/*.md` を拒否することがある。`claude -p` で Workflow を走らせるときは `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` を付ける。
 - `plugin.json`、`.claude-plugin/plugin.json`、`.claude-plugin/marketplace.json` の `name` / `version` / `description` はそろえる。
 
 ## コマンド

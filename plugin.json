@@ -9,5 +9,6 @@
   },
   "homepage": "https://github.com/AJpon/agentic-doc",
   "repository": "https://github.com/AJpon/agentic-doc",
+  "license": "MIT",
   "keywords": ["skills", "workflows", "documentation", "wiki"]
 }
