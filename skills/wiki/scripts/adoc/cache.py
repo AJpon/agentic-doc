@@ -72,16 +72,18 @@ def _store_key(cfg: Config, page: dict, kind: str, key: str) -> None:
     path.write_bytes((json.dumps(keys, indent=2) + "\n").encode("utf-8"))
 
 
-def save_research(cfg: Config, page: dict) -> None:
-    """research.json を検証し、今の入力のキーを記録する."""
+def save_research(cfg: Config, page: dict, source: Path | None = None) -> None:
+    """research の結果（source、無ければ research.json）を検証し、research.json に置いて、今の入力のキーを記録する."""
     path, note = research_file(cfg, page), note_file(cfg, page)
-    rel = path.relative_to(cfg.root).as_posix()
-    if not path.is_file():
+    src = source or path
+    rel = src.as_posix() if source else path.relative_to(cfg.root).as_posix()
+    if not src.is_file():
         raise Refused(f"research result not found: {rel}")
     if not note.is_file():
         raise Refused(f"research notes not found: {note.relative_to(cfg.root).as_posix()}")
+    text = src.read_text(encoding="utf-8")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(text)
     except json.JSONDecodeError as e:
         raise Refused(f"{rel} is not valid JSON: {e.msg}") from e
     validator = Draft202012Validator(json.loads(RESEARCH_SCHEMA.read_text(encoding="utf-8")))
@@ -90,6 +92,8 @@ def save_research(cfg: Config, page: dict) -> None:
         e = errors[0]
         raise Refused(f"{rel} does not match the research schema: /{'/'.join(str(p) for p in e.absolute_path)}: "
                       f"{e.message}")
+    if source:
+        path.write_bytes(text.encode("utf-8"))
     _store_key(cfg, page, "research", research_key(cfg, page))
 
 

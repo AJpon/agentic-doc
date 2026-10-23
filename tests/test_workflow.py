@@ -337,12 +337,22 @@ def test_failed_unverify_throws():
 
 def test_fresh_research_is_saved_before_write():
     r = run_wf(SYNC, clean_responses(["a/x"]))
-    save = call(r, "cache:research:a/x")
-    assert inputs(save)["command"] == f"{SCRIPT} cache save research a/x"
+    save = inputs(call(r, "cache:research:a/x"))
+    assert save["command"] == f"{SCRIPT} cache save research a/x <FILE>"
+    assert json.loads(save["file"]) == research("a/x")
     assert labels(r).index("research:a/x") < labels(r).index("cache:research:a/x") < labels(r).index("write:a/x")
     w = inputs(call(r, "write:a/x"))
     assert w["research_path"] == ".agentic-doc/work/a/x/research.json"
     assert w["note_path"] == ".agentic-doc/work/a/x/research.md" and "research" not in w
+
+
+def test_research_cache_save_is_retried_once():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("cache:research:a/x"), {"__seq": [cmdres("", 2), cmdres("")]})]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert labels(r).count("cache:research:a/x") == 2
+    assert r["result"]["pages"][0]["result"] == "verified"
 
 
 def test_failed_research_cache_save_fails_the_page():
@@ -398,3 +408,35 @@ def test_failed_written_cache_save_is_not_fatal():
     responses += page_responses("a/x")
     r = run_wf(SYNC, responses)
     assert r["result"]["pages"][0]["result"] == "verified"
+
+
+def _resave_run(claim=None, dead=frozenset(), integrate=INTEGRATE):
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", integrate),
+                 (r"^resave:", cmdres(""))]
+    responses += page_responses("a/x", claim=claim, dead=dead)
+    return run_wf(SYNC, responses)
+
+
+def test_unresolved_page_findings_and_cache_are_saved_again_after_integrate():
+    r = _resave_run(claim=verdict("claim", [BLOCKER]))
+    seq = [label for label in labels(r) if label in ("integrate", "resave:findings:a/x", "resave:cache:a/x")]
+    assert seq[0] == "integrate" and sorted(seq[1:]) == ["resave:cache:a/x", "resave:findings:a/x"]
+    f = inputs(call(r, "resave:findings:a/x"))
+    assert f["command"] == f"{SCRIPT} findings save a/x <FILE>"
+    assert json.loads(f["file"]) == [{**BLOCKER, "lens": "claim"}]
+    assert inputs(call(r, "resave:cache:a/x"))["command"] == f"{SCRIPT} cache save written a/x"
+
+
+def test_unverified_page_cache_is_saved_again_after_integrate():
+    r = _resave_run(dead={"verify"})
+    assert "resave:cache:a/x" in labels(r) and "resave:findings:a/x" not in labels(r)
+
+
+def test_verified_page_needs_no_resave():
+    r = _resave_run()
+    assert not any(label.startswith("resave:") for label in labels(r))
+
+
+def test_no_resave_when_integrate_failed():
+    r = _resave_run(claim=verdict("claim", [BLOCKER]), integrate=None)
+    assert not any(label.startswith("resave:") for label in labels(r))

@@ -139,6 +139,8 @@ def convert(cfg: Config, old: dict) -> tuple[dict, list[str]]:
     """旧形式のカタログ（chapters 無し）を現行の形式に変換する。ページはそのまま保つ."""
     if not isinstance(old, dict) or not isinstance(old.get("pages"), list):
         raise Refused("not an old-format catalogue: no pages array")
+    if "chapters" in old:
+        raise Refused("not an old-format catalogue: it already has chapters (use catalogue install to place it)")
     warnings = []
     lang = old.get("language")
     if lang is not None and lang != cfg.language:

@@ -44,6 +44,22 @@ def test_save_research_needs_the_note(five):
     assert code == 2 and "research.md" in err
 
 
+def test_save_research_from_a_file_writes_research_json(five):
+    five.write(f"{WORK}/research.md", "notes\n")
+    five.write("input.json", dump(RESEARCH))
+    assert run_cli(five.root, "cache", "save", "research", PAGE, "input.json")[0] == 0
+    assert json.loads((five.root / WORK / "research.json").read_text(encoding="utf-8")) == RESEARCH
+    assert show(five)["research"]["hit"] is True
+
+
+def test_save_research_from_an_invalid_file_is_refused(five):
+    five.write(f"{WORK}/research.md", "notes\n")
+    five.write("input.json", dump({"page_id": PAGE}))
+    code, _, err = run_cli(five.root, "cache", "save", "research", PAGE, "input.json")
+    assert code == 2 and "schema" in err
+    assert not (five.root / WORK / "research.json").exists()
+
+
 def test_research_hit_after_save(five):
     assert save_research(five)[0] == 0
     hit = show(five)["research"]

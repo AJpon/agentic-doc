@@ -245,6 +245,17 @@ def test_migrate_removes_old_file(legacy):
     assert not (legacy.root / OLD).exists()
 
 
+def test_migrate_refuses_a_current_format_catalogue(wiki):
+    data = json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    data["chapters"][0]["title"] = "Real Title"
+    wiki.write(OLD, dump(data))
+    (wiki.root / "docs/wiki/catalogue.json").unlink()
+    wiki.commit()
+    code, _, err = migrate(wiki)
+    assert code == 2 and "chapters" in err
+    assert (wiki.root / OLD).exists() and not (wiki.root / "docs/wiki/catalogue.json").exists()
+
+
 def test_migrate_warns_when_sources_hit_only_excluded_files(legacy):
     legacy.write("vendor/x.py", "x\n")
     data = json.loads((legacy.root / OLD).read_text(encoding="utf-8"))

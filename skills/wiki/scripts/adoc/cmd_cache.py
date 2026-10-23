@@ -13,6 +13,8 @@ def add_args(p: argparse.ArgumentParser) -> None:
     s = sub.add_parser("save", help="record that research.json or the page body is current")
     s.add_argument("kind", choices=["research", "written"], help="research: validate research.json; written: the page body")
     s.add_argument("page_id", metavar="PAGE_ID")
+    s.add_argument("file", nargs="?", metavar="FILE",
+                   help="research only: the research result as JSON (default: the page's research.json)")
     sh = sub.add_parser("show", help="print, as JSON, whether the cached research and page body are still valid")
     sh.add_argument("page_id", metavar="PAGE_ID")
 
@@ -21,7 +23,10 @@ def run(args: argparse.Namespace) -> int:
     cfg = config.load(Path.cwd())
     page = catalogue.select(catalogue.load(cfg), [args.page_id])[0]
     if args.action == "save":
-        (cache.save_research if args.kind == "research" else cache.save_written)(cfg, page)
+        if args.kind == "research":
+            cache.save_research(cfg, page, Path(args.file) if args.file else None)
+        else:
+            cache.save_written(cfg, page)
         print(f"{page['id']}  {args.kind}  saved")
         return 0
     print(json.dumps(cache.show(cfg, page), indent=2, ensure_ascii=False))

@@ -39,10 +39,10 @@ For each page in `targets`, do the following steps. If one page fails, record th
 2. **Use the cache.** Each target has `cache` in the plan output. It is valid only while the page's `brief` and the contents of its source files are unchanged.
    - If `cache.written.hit` is true, the page body from the interrupted run is still valid. Skip steps 3–4 and start at step 5 (verify). Add the page file to `written_files`.
    - If `cache.research.hit` is true, skip step 3. Use `cache.research.path` as `research_path` and `cache.research.note_path` as `note_path` in step 4.
-3. **Research.** Follow `<SKILL_DIR>/references/sync-research.md`. Inputs: `page` (the target) and `note_path` = `<work_dir>/<id>/research.md`. When you finish, record it. If this command refuses, the research result is not usable: record the failure and continue with the next page.
+3. **Research.** Follow `<SKILL_DIR>/references/sync-research.md`. Inputs: `page` (the target) and `note_path` = `<work_dir>/<id>/research.md`. When you finish, write your research result as JSON to `<work_dir>/<id>/research-input.json`, using your file-writing tool, then record it. If this command refuses, the research result is not usable: record the failure and continue with the next page.
 
    ```bash
-   uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" cache save research <id>
+   uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" cache save research <id> <work_dir>/<id>/research-input.json
    ```
 
 4. **Write.** Follow `<SKILL_DIR>/references/sync-write.md`. Inputs: `page`, `research_path` (`<work_dir>/<id>/research.json`), `note_path`, and `today` from the plan. When you finish, and after every fix round in step 6, record the page body. If this command fails, continue anyway.
@@ -78,6 +78,15 @@ For each page in `targets`, do the following steps. If one page fails, record th
 If at least one page was processed (its result is `verified`, `unresolved` or `unverified`), follow `<SKILL_DIR>/references/sync-integrate.md`. Inputs:
 - `pages`: every processed page, with its result (`verified`, `unresolved` or `unverified`).
 - `written_files`: the page files you wrote or fixed, relative to the repository root (`<wiki_dir>/<path>`).
+
+Integrate can change a page body (links, `post_commands`), which invalidates the findings and the written-page cache you saved earlier. For every page whose result is `unresolved` or `unverified`, save them again, using the same findings as before:
+
+```bash
+uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" findings save <id> <work_dir>/<id>/findings-input.json
+uv run --script "<SKILL_DIR>/scripts/agentic_doc.py" cache save written <id>
+```
+
+Run the first command only for `unresolved` pages. Skip this step if integrate failed.
 
 ## 4. Report
 

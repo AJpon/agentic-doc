@@ -336,7 +336,7 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | `stamp` | 7.6 |
 | `unverify --pages <id>...` | 書き直す前のページの `source_commit` を null に戻す。書き直しが検証を通らずに終わったページが「最新」に見えないようにするため、sync が対象のうち `source_commit` を持つページに対して最初に実行する |
 | `findings` | 未解決の指摘（10.2）を保存・表示・削除する。`findings save <id> <file>`（`-` で標準入力。`schemas/findings.schema.json` で検証する）、`findings show <id>`（本文のハッシュが一致しなければ破棄して `null`）、`findings clear <id>`。Workflow はファイルを書けないため、エージェントがこのコマンドで保存する |
-| `cache` | 中断後の再開用に、research の結果と書き込み済みの本文を記録・照会する（10.2）。`cache save research <id>`（作業ディレクトリの `research.json` を `schemas/research.schema.json` で検証し、`research.md` の存在を確かめ、入力のキーを記録する）、`cache save written <id>`（今の本文のキーを記録する）、`cache show <id>`（どちらが今も有効かを JSON で出す。`plan` の各対象の `cache` も同じ形） |
+| `cache` | 中断後の再開用に、research の結果と書き込み済みの本文を記録・照会する（10.2）。`cache save research <id> [<file>]`（research の結果の JSON を `schemas/research.schema.json` で検証し、作業ディレクトリの `research.json` に置いて、入力のキーを記録する。`<file>` が無ければ既存の `research.json` を検証する。`research.md` の存在も確かめる）、`cache save written <id>`（今の本文のキーを記録する）、`cache show <id>`（どちらが今も有効かを JSON で出す。`plan` の各対象の `cache` も同じ形） |
 | `toc` | カタログから目次（`<wiki_dir>/README.md`）を生成し、`related` の相互リンクを双方向にし、各ページのフロントマターの `title` / `audience` / `updated` をカタログに揃える |
 | `post` | `post_commands` を実行する。ファイルの指定が無ければ何も実行しない。`{files}` を他の文字と連結した引数があれば、どのコマンドも実行せずに拒否する |
 
@@ -376,7 +376,7 @@ lint がこれらを前提に検査するため、設定では変えられない
 
 - **ページ単位**: 状態はカタログの `source_commit` と Wiki のファイルの有無にある。検証を通ったページはそのつど `checkpoint` が記録するので、止まったあとに `sync` を実行し直せば残りのページだけを処理する。`toc` は何度実行しても同じ結果になる。
 - **未解決の指摘の引き継ぎ**: 最大ラウンドの fix のあとも指摘が残ったページは、`.agentic-doc/work/<page-id>/findings.json` に指摘とページ本文のハッシュを保存する。次の `sync` でこれが見つかり、本文のハッシュが一致すれば、research と write を飛ばして指摘を fix に渡す。一致しなければ人が手で直したとみなして破棄し、通常の処理に戻す。`checkpoint` を書いたときに削除する。
-- **research と書き込み済みの本文のキャッシュ**: research は最も重い工程なので、中断後は有効な結果を再利用する。research のエージェントは、メモ（`research.md`）と結果（`research.json`）を作業ディレクトリに書き、`cache save research` がスキーマ検証とキーの記録（`cache.json`）を行う。キーは、ページの `title`・`brief` と、`sources` に展開されるファイルの内容（作業ツリー）のハッシュで、無関係なコミットでは無効にならない。write のあと、および fix の各ラウンドのあとに `cache save written` を行い、本文と research のキーから決まるキーを記録する。次の `sync` で `plan` が各対象の `cache` を示し、research が有効なら research を、本文も有効なら research と write を飛ばして、write への入力（`research_path`・`note_path`）か検証から再開する。`checkpoint` が作業ディレクトリごと削除する。
+- **research と書き込み済みの本文のキャッシュ**: research は最も重い工程なので、中断後は有効な結果を再利用する。research のエージェントはメモ（`research.md`）を作業ディレクトリに書き、返した結果を呼び出し側が `cache save research <id> <file>` で保存する（Workflow は返り値のオブジェクトを渡し、失敗したら 1 回やり直す）。このコマンドが結果のスキーマ検証と `research.json` の配置、キーの記録（`cache.json`）を行う。キーは、ページの `title`・`brief` と、`sources` に展開されるファイルの内容（作業ツリー）のハッシュで、無関係なコミットでは無効にならない。write のあと、および fix の各ラウンドのあとに `cache save written` を行い、本文と research のキーから決まるキーを記録する。次の `sync` で `plan` が各対象の `cache` を示し、research が有効なら research を、本文も有効なら research と write を飛ばして、write への入力（`research_path`・`note_path`）か検証から再開する。整形（`post_commands` など）で本文が変わると、保存済みの指摘と書き込み済みのキャッシュは本文のハッシュが合わなくなる。そのため integrate のあと、checkpoint されていない（`unresolved` と `unverified` の）ページについて、指摘（`unresolved` のみ）と `cache save written` を保存し直す。`checkpoint` が作業ディレクトリごと削除する。
 - **作業ディレクトリの ignore**: スクリプトが作業ディレクトリを最初に作るとき、`skills/wiki/assets/work/.gitignore.in` を `.agentic-doc/work/.gitignore` としてコピーする（既にあれば上書きしない）。中身は `*` だけで、ディレクトリ全体が git から見えなくなる。導入先の `.gitignore` は変更しない。
 - Claude Code の `resumeFromRunId` は同じセッション内でしか使えないので、主な仕組みにしない。
 

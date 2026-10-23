@@ -161,9 +161,15 @@ async function runSync() {
 
   // Research is the heaviest step, so a result that is still valid (same brief and same source contents)
   // is reused after an interruption. `plan` reports it per target in page.cache.
-  async function saveCache(kind, page) {
-    const r = await runCommand('cache:' + kind + ':' + page.id, 'Record', cmd('cache', 'save', kind, page.id))
-    if (r && r.exit_code === 0) return true
+  async function saveCache(kind, page, result) {
+    // Research is saved from the object the agent returned (schema-checked), not from a file the agent wrote.
+    const argv = ['cache', 'save', kind, page.id].concat(result === undefined ? [] : ['<FILE>'])
+    const file = result === undefined ? undefined : JSON.stringify(result)
+    let r = null
+    for (let attempt = 1; attempt <= (kind === 'research' ? 2 : 1); attempt++) {
+      r = await runCommand('cache:' + kind + ':' + page.id, 'Record', cmd(...argv), file)
+      if (r && r.exit_code === 0) return true
+    }
     log(page.id + ': caching the ' + kind + ' result failed' + (r ? ' (exit ' + r.exit_code + '): ' + r.stderr.trim() : ''))
     return false
   }
@@ -199,7 +205,7 @@ async function runSync() {
       schema: SCHEMAS.research,
     })
     if (!research) throw new Error('research failed: ' + page.id)
-    if (!(await saveCache('research', page))) throw new Error('research result is not usable: ' + page.id)
+    if (!(await saveCache('research', page, research))) throw new Error('research result is not usable: ' + page.id)
     return { researchPath: plan.work_dir + '/' + page.id + '/research.json', notePath }
   }
 
@@ -234,6 +240,7 @@ async function runSync() {
       written: ctx.written || (ctx.resume || ctx.rewritten ? plan.wiki_dir + '/' + page.path : null),
       result: kind,
       findings: findings.length,
+      list: findings,
       disputed,
     })
     const disputed = []
@@ -295,6 +302,20 @@ async function runSync() {
       { label: 'integrate', phase: 'Integrate', schema: SCHEMAS.integrate }
     )
     if (!integrate) log('integrate failed: the table of contents, links and post_commands were not updated')
+    else {
+      // Integrate (links, post_commands) can change a page body, which invalidates the findings and the written
+      // cache saved before it. Save them again for the pages that are not checkpointed, so the next sync resumes.
+      await parallel(
+        pages
+          .filter((p) => p.result === 'unresolved' || p.result === 'unverified')
+          .map((p) => async () => {
+            if (p.result === 'unresolved' && p.list.length) {
+              await runCommand('resave:findings:' + p.id, 'Record', cmd('findings', 'save', p.id, '<FILE>'), JSON.stringify(p.list))
+            }
+            await runCommand('resave:cache:' + p.id, 'Record', cmd('cache', 'save', 'written', p.id))
+          })
+      )
+    }
   }
   return {
     mode: 'sync',
