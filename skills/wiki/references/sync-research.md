@@ -26,7 +26,8 @@ Gather the facts that the writer needs to answer the page's question. Do not wri
    - The values of the constants.
    - The relationships that are worth a diagram.
 
-You may write only `note_path`.
+
+You may write only `note_path`. The result you return is saved by the caller (`cache save research`), which checks it against the schema. After an interruption, the next sync reuses the notes and that result instead of researching again.
 
 ## Output
 

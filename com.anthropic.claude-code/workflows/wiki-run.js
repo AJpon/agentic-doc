@@ -86,6 +86,11 @@ async function runPlan(planArgs) {
   }
   if (!/^[0-9a-f]{40}$/.test(plan.head || '')) throw new Error('plan.head is not a 40-digit SHA: ' + plan.head)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(plan.today || '')) throw new Error('plan.today is not YYYY-MM-DD: ' + plan.today)
+  // The plan output is transcribed by an agent; a dropped target would silently go unprocessed.
+  if (!Array.isArray(plan.targets) || plan.targets.length !== plan.target_count) {
+    throw new Error('plan transcription is incomplete: ' + (Array.isArray(plan.targets) ? plan.targets.length : 'no') +
+      ' targets, target_count ' + plan.target_count)
+  }
   const w = plan.warnings || {}
   if ((w.uncommitted || []).length) log('warning: uncommitted changes in sources: ' + w.uncommitted.join(', '))
   if ((w.untracked || []).length) log('warning: untracked files in sources: ' + w.untracked.join(', '))
@@ -154,6 +159,21 @@ async function runSync() {
     }
   }
 
+  // Research is the heaviest step, so a result that is still valid (same brief and same source contents)
+  // is reused after an interruption. `plan` reports it per target in page.cache.
+  async function saveCache(kind, page, result) {
+    // Research is saved from the object the agent returned (schema-checked), not from a file the agent wrote.
+    const argv = ['cache', 'save', kind, page.id].concat(result === undefined ? [] : ['<FILE>'])
+    const file = result === undefined ? undefined : JSON.stringify(result)
+    let r = null
+    for (let attempt = 1; attempt <= (kind === 'research' ? 2 : 1); attempt++) {
+      r = await runCommand('cache:' + kind + ':' + page.id, 'Record', cmd(...argv), file)
+      if (r && r.exit_code === 0) return true
+    }
+    log(page.id + ': caching the ' + kind + ' result failed' + (r ? ' (exit ' + r.exit_code + '): ' + r.stderr.trim() : ''))
+    return false
+  }
+
   async function prepare(page) {
     if (page.pending > 0) {
       const r = await runCommand('findings:' + page.id, 'Research', cmd('findings', 'show', page.id))
@@ -168,6 +188,16 @@ async function runSync() {
         return { resume: saved }
       }
     }
+    const hit = page.cache || {}
+    const researchHit = hit.research && hit.research.hit ? hit.research : null
+    if (researchHit && hit.written && hit.written.hit) {
+      log(page.id + ': the written page is still valid; going straight to verification')
+      return { rewritten: true, notePath: researchHit.note_path }
+    }
+    if (researchHit) {
+      log(page.id + ': reusing the cached research')
+      return { researchPath: researchHit.path, notePath: researchHit.note_path }
+    }
     const notePath = plan.work_dir + '/' + page.id + '/research.md'
     const research = await agent(task('sync-research.md', { page, note_path: notePath }), {
       label: 'research:' + page.id,
@@ -175,17 +205,19 @@ async function runSync() {
       schema: SCHEMAS.research,
     })
     if (!research) throw new Error('research failed: ' + page.id)
-    return { research, notePath }
+    if (!(await saveCache('research', page, research))) throw new Error('research result is not usable: ' + page.id)
+    return { researchPath: plan.work_dir + '/' + page.id + '/research.json', notePath }
   }
 
   async function write(ctx, page) {
-    if (ctx.resume) return ctx
-    const w = await agent(task('sync-write.md', { page, research: ctx.research, today: plan.today }), {
+    if (ctx.resume || ctx.rewritten) return ctx
+    const w = await agent(task('sync-write.md', { page, research_path: ctx.researchPath, note_path: ctx.notePath, today: plan.today }), {
       label: 'write:' + page.id,
       phase: 'Write',
       schema: SCHEMAS.write,
     })
     if (!w || w.written === false) throw new Error('write failed: ' + page.id)
+    await saveCache('written', page)
     return { ...ctx, written: w.path }
   }
 
@@ -204,9 +236,11 @@ async function runSync() {
     const result = (kind, findings, disputed) => ({
       id: page.id,
       path: page.path,
-      written: ctx.written || null,
+      // A page resumed from saved findings is rewritten by fix, so it also goes to post_commands.
+      written: ctx.written || (ctx.resume || ctx.rewritten ? plan.wiki_dir + '/' + page.path : null),
       result: kind,
       findings: findings.length,
+      list: findings,
       disputed,
     })
     const disputed = []
@@ -229,6 +263,7 @@ async function runSync() {
       })
       if (!fixed) log(page.id + ': the fix agent failed (round ' + round + ')')
       else disputed.push(...(fixed.disputed || []))
+      await saveCache('written', page)
       const verdicts = await runVerify(page)
       if (!verdicts) return result('unverified', [], disputed)
       findings = blocking(verdicts)
@@ -267,6 +302,20 @@ async function runSync() {
       { label: 'integrate', phase: 'Integrate', schema: SCHEMAS.integrate }
     )
     if (!integrate) log('integrate failed: the table of contents, links and post_commands were not updated')
+    else {
+      // Integrate (links, post_commands) can change a page body, which invalidates the findings and the written
+      // cache saved before it. Save them again for the pages that are not checkpointed, so the next sync resumes.
+      await parallel(
+        pages
+          .filter((p) => p.result === 'unresolved' || p.result === 'unverified')
+          .map((p) => async () => {
+            if (p.result === 'unresolved' && p.list.length) {
+              await runCommand('resave:findings:' + p.id, 'Record', cmd('findings', 'save', p.id, '<FILE>'), JSON.stringify(p.list))
+            }
+            await runCommand('resave:cache:' + p.id, 'Record', cmd('cache', 'save', 'written', p.id))
+          })
+      )
+    }
   }
   return {
     mode: 'sync',

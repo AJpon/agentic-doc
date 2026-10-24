@@ -117,6 +117,15 @@ def test_source_glob_empty(good):
     assert_error(good, "source-glob-empty")
 
 
+def test_single_nested_source_with_exclude(good):
+    good.write("a/b/c.py", "m\n")
+    good.commit()
+    good.config(exclude=["zzz/**"])
+    mutate(good, lambda d: d["pages"][0].update(sources=["a/b/c.py"]))
+    code, found = check(good)
+    assert "source-glob-empty" not in found and code == 0
+
+
 def test_chapter_empty(good):
     mutate(good, lambda d: d["chapters"].append({"id": "c", "title": "C", "description": "d"}))
     code, found = check(good)
@@ -162,3 +171,125 @@ def test_check_missing_or_broken_file_is_2(good):
     assert run_cli(good.root, "catalogue", "check", "nope.json")[0] == 2
     good.write(WORK, "{not json")
     assert run_cli(good.root, "catalogue", "check", WORK)[0] == 2
+
+
+OLD = "docs/wiki/_catalogue.json"
+
+
+@pytest.fixture
+def legacy(wiki):
+    """wiki フィクスチャのカタログを、fbx-view の旧形式（chapters 無し、余分なキー付き）に置き換える."""
+    data = json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    wiki.write(OLD, dump({"version": 1, "language": "en", "citation_style": "local", "pages": data["pages"]}))
+    (wiki.root / "docs/wiki/catalogue.json").unlink()
+    wiki.commit()
+    return wiki
+
+
+def migrate(r, *extra) -> tuple[int, str, str]:
+    return run_cli(r.root, "catalogue", "migrate", OLD, *extra)
+
+
+def test_migrate_builds_chapters_from_ids(legacy):
+    code, _, err = migrate(legacy)
+    assert code == 0, err
+    data = json.loads((legacy.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    assert data["chapters"] == [{"id": "g", "title": "g", "description": ""}]
+    assert "language" not in data and "citation_style" not in data
+    assert run_cli(legacy.root, "catalogue", "check")[0] == 0
+
+
+def test_migrate_keeps_source_commit(wiki):
+    _, before, _ = run_cli(wiki.root, "status", "--json")
+    data = json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    wiki.write(OLD, dump({"version": 1, "language": "en", "pages": data["pages"]}))
+    (wiki.root / "docs/wiki/catalogue.json").unlink()
+    wiki.commit()
+    assert migrate(wiki)[0] == 0
+    wiki.commit()
+    _, after, _ = run_cli(wiki.root, "status", "--json")
+    state = lambda s: [(p["id"], p["state"]) for p in json.loads(s)["pages"]]
+    assert state(after) == state(before)
+    assert [p["source_commit"] for p in json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(
+        encoding="utf-8"))["pages"]] == [p["source_commit"] for p in data["pages"]]
+
+
+def test_migrate_takes_title_from_readme(legacy):
+    legacy.write("docs/wiki/README.md", "intro\n\n# My Wiki\n\n## Chapter\n")
+    assert migrate(legacy)[0] == 0
+    assert json.loads((legacy.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))["title"] == "My Wiki"
+
+
+def test_migrate_refuses_existing_without_force(legacy):
+    legacy.write("docs/wiki/catalogue.json", "keep\n")
+    code, _, err = migrate(legacy)
+    assert code == 2 and "already exists" in err
+    assert (legacy.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8") == "keep\n"
+    assert (legacy.root / OLD).exists()
+    assert migrate(legacy, "--force")[0] == 0
+
+
+def test_migrate_reports_errors_without_writing(legacy):
+    data = json.loads((legacy.root / OLD).read_text(encoding="utf-8"))
+    data["pages"][0]["related"] = ["g/nowhere"]
+    legacy.write(OLD, dump(data))
+    code, out, _ = migrate(legacy)
+    assert code == 1 and "related-unknown" in out
+    assert not (legacy.root / "docs/wiki/catalogue.json").exists()
+    assert (legacy.root / OLD).exists()
+
+
+def test_migrate_removes_old_file(legacy):
+    code, out, _ = migrate(legacy)
+    assert code == 0 and "docs/wiki/catalogue.json" in out
+    assert not (legacy.root / OLD).exists()
+
+
+def test_migrate_refuses_a_current_format_catalogue(wiki):
+    data = json.loads((wiki.root / "docs/wiki/catalogue.json").read_text(encoding="utf-8"))
+    data["chapters"][0]["title"] = "Real Title"
+    wiki.write(OLD, dump(data))
+    (wiki.root / "docs/wiki/catalogue.json").unlink()
+    wiki.commit()
+    code, _, err = migrate(wiki)
+    assert code == 2 and "chapters" in err
+    assert (wiki.root / OLD).exists() and not (wiki.root / "docs/wiki/catalogue.json").exists()
+
+
+def test_migrate_warns_when_sources_hit_only_excluded_files(legacy):
+    legacy.write("vendor/x.py", "x\n")
+    data = json.loads((legacy.root / OLD).read_text(encoding="utf-8"))
+    data["pages"][0]["sources"] = ["vendor/*.py"]
+    legacy.write(OLD, dump(data))
+    legacy.config(exclude=["vendor/**"])
+    legacy.commit()
+    code, out, _ = migrate(legacy, "--json")
+    assert code == 0, out
+    assert any("source-glob-empty" in w for w in json.loads(out)["warnings"])
+    assert (legacy.root / "docs/wiki/catalogue.json").exists()
+
+
+def test_migrate_warns_language_mismatch(legacy):
+    legacy.config(language="ja")
+    code, out, _ = migrate(legacy, "--json")
+    result = json.loads(out)
+    assert code == 0
+    assert any("language" in w for w in result["warnings"])
+    assert result["chapters"] == 1 and result["pages"] == 2
+
+
+def test_duplicate_chapter(good):
+    mutate(good, lambda d: d["chapters"].append({"id": "a", "title": "A2", "description": "d"}))
+    assert_error(good, "duplicate-chapter")
+
+
+@pytest.mark.parametrize("bad", ["A/one", "a/One", "a/on e", "a/_x", "a/-x"])
+def test_id_chars(good, bad):
+    mutate(good, lambda d: d["pages"].append(_page(bad, path=bad + ".md")))
+    assert_error(good, "id-chars")
+
+
+def test_install_creates_work_gitignore(good):
+    good.write("other/catalogue.json", dump(GOOD))
+    assert run_cli(good.root, "catalogue", "install", "other/catalogue.json")[0] == 0
+    assert (good.root / ".agentic-doc/work/.gitignore").is_file()

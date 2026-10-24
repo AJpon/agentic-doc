@@ -88,6 +88,15 @@ def test_glob_star_migration_warning(wiki):
     assert "source-glob-empty" in issue_codes(wiki, "g/page")
 
 
+def test_single_nested_source_with_exclude(wiki):
+    wiki.write("a/b/c.py", "y\n")
+    wiki.commit()
+    wiki.config(exclude=["zzz/**"])
+    set_sources(wiki, "g/page", ["a/b/c.py"])
+    wiki.commit()
+    assert "source-glob-empty" not in issue_codes(wiki, "g/page")
+
+
 def test_untracked_and_uncommitted_sources(wiki):
     wiki.write("src/new.py", "n")
     wiki.write("src/a.py", "1\n2\n3\n4\n")

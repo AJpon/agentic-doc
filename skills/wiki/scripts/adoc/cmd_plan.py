@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from adoc import catalogue, config, dates, gitutil, state, workdir
+from adoc import cache, catalogue, config, dates, gitutil, state, workdir
 from adoc.cli import Command
 from adoc.state import State
 
@@ -41,7 +41,8 @@ def run(args: argparse.Namespace) -> int:
     for p in pages:
         st = state.classify(cfg, p)
         if explicit or st.state in wanted:
-            targets.append({**p, "state": st.state.value, "reason": reason(st, explicit), "pending": st.pending})
+            targets.append({**p, "state": st.state.value, "reason": reason(st, explicit), "pending": st.pending,
+                            "cache": cache.show(cfg, p)})
         else:
             skipped.append({"id": p["id"], "state": st.state.value})
     work = workdir.ensure_root(cfg)
@@ -51,6 +52,7 @@ def run(args: argparse.Namespace) -> int:
         "work_dir": work.relative_to(cfg.root).as_posix(),
         "today": args.today or dates.today(),
         "targets": targets,
+        "target_count": len(targets),
         "skipped": skipped,
         "warnings": state.warnings(cfg, data["pages"]),
     }

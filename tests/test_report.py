@@ -77,3 +77,14 @@ def test_drift_off_schema_is_2(wiki):
 def test_text_output_is_localized(five):
     five.config(language="ja")
     assert "次の操作" in run_cli(five.root, "report")[1]
+
+
+def test_minor_only_drift_on_changed_page_suggests_check(five):
+    _, d = report(five, drift={"results": [{"page_id": "g/changed", "issues": [ISSUE("minor", "p")]}],
+                               "failed": []})
+    assert any("stamp --pages g/changed" in s and "sync --pages g/changed" in s for s in d["next"])
+
+
+def test_lint_only_changed_page_suggests_audit(five):
+    _, d = report(five)
+    assert any("g/changed" in s and "audit" in s for s in d["next"])

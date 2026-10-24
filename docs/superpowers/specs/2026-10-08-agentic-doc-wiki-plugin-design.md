@@ -192,7 +192,7 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 }
 ```
 
-- `id` は `章/ページ` 形式。章の部分は `chapters[].id` のどれかと一致する。
+- `id` は `章/ページ` 形式。章の部分は `chapters[].id` のどれかと一致する。章 ID とページ ID の各部分は小文字の英字・数字・ハイフンで、英字か数字で始まる。`chapters[].id` は重複させない。
 - `path` は `<id>.md` と完全に一致させる。連番の接頭辞は付けない。
 - `pages` 配列の並び順が読む順序の正である。
 - 章は最大 6、1 章あたりのページは最大 8、全ページ数は `max_pages` 以下。
@@ -240,7 +240,7 @@ agentic-doc/                          # リポジトリ = プラグインのル�
 1. 初回の 1〜2 をやり直し、現状との差分だけを提案する（例: 新しい生成物ディレクトリが `exclude` に無い、`file` の指す先が消えた、フォーマッタが変わった）。
 2. 承認された項目だけを書き換え、`config check` を通す。
 3. `exclude` が変わった場合は、除外したファイルを `sources` に持つページを示し、そのページの再生成か `outline` の見直しを勧める。
-4. 設定の `catalogue` が指す先にファイルが無く、既定の場所や旧名（`_catalogue.json`）に見つかった場合は、設定の書き換えかファイルの移動を提案する。
+4. 設定の `catalogue` が指す先にファイルが無く、既定の場所や旧名（`_catalogue.json`）に見つかった場合は、設定の書き換えかファイルの移動を提案する。見つかったのが旧形式（`chapters` が無い。元実装のカタログ）なら、`catalogue migrate` での変換を提案し、変換後に章の `title` と `description` を既存の目次から埋める案を示す。
 
 ### 7.2 outline
 
@@ -327,14 +327,16 @@ LLM を使わず、全ハーネスで同じ結果になる処理をスクリプ�
 | `config show` | 既定値を補った設定、`context` / `instructions` の本文（`file` は毎回読む）、言語ごとの固定の文字列（`strings`）を JSON で出す。全フェーズのエージェントが最初に読む |
 | `catalogue check [FILE]` | カタログを 6 章の制約（ID と path、章とページの上限、audience、related、sources の 0 件マッチなど）で検査する。FILE を省くと設定のカタログを検査し、書式も確かめる |
 | `catalogue install FILE [--force]` | 検査を通ったカタログを設定の場所に置く。既存のカタログは `--force` が無ければ拒否する。全ページの `source_commit` と `reviewed_at` を null にする |
+| `catalogue migrate FILE [--force] [--json]` | 旧形式のカタログ（`chapters` が無い）を変換して設定の場所に置く。章はページ ID の前半から作り（`title` は ID、`description` は空）、カタログの `title` は `<wiki_dir>/README.md` の最初の H1 から採る。`source_commit` と `reviewed_at` は保つ。余分なトップレベルのキー（`language`、`citation_style`）は捨て、`language` が設定と違えば警告する。既存のカタログは `--force` が無ければ拒否する。成功したら元のファイルを消す |
 | `report [--drift FILE]` | lint と drift の結果から audit の報告（ページごとの最悪の重大度、件数、次の操作）を組み立てる |
 | `status` | ページの状態の表示（7.4）。`--json` は他のコマンドの入力になる |
-| `plan` | sync の対象、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
+| `plan` | sync の対象とその件数（`target_count`。Workflow が転記の欠落を検知する）、HEAD、日付、警告、`wiki_dir`、`work_dir` を JSON で出す。判定は `status` と共通。作業ディレクトリと `.gitignore` を用意する |
 | `lint` | 機械的な検査（7.5 の 1）。`--citations <id>` で、ページ内の全引用と引用先の実際の行を並べて出す（引用レンズが使う） |
 | `checkpoint` | 指定ページの `source_commit` と `reviewed_at` を書く。作業ディレクトリの該当ページを削除する。本文ファイルが無いページ、HEAD の祖先でないコミット、正規の書式でないカタログは拒否する |
 | `stamp` | 7.6 |
 | `unverify --pages <id>...` | 書き直す前のページの `source_commit` を null に戻す。書き直しが検証を通らずに終わったページが「最新」に見えないようにするため、sync が対象のうち `source_commit` を持つページに対して最初に実行する |
 | `findings` | 未解決の指摘（10.2）を保存・表示・削除する。`findings save <id> <file>`（`-` で標準入力。`schemas/findings.schema.json` で検証する）、`findings show <id>`（本文のハッシュが一致しなければ破棄して `null`）、`findings clear <id>`。Workflow はファイルを書けないため、エージェントがこのコマンドで保存する |
+| `cache` | 中断後の再開用に、research の結果と書き込み済みの本文を記録・照会する（10.2）。`cache save research <id> [<file>]`（research の結果の JSON を `schemas/research.schema.json` で検証し、作業ディレクトリの `research.json` に置いて、入力のキーを記録する。`<file>` が無ければ既存の `research.json` を検証する。`research.md` の存在も確かめる）、`cache save written <id>`（今の本文のキーを記録する）、`cache show <id>`（どちらが今も有効かを JSON で出す。`plan` の各対象の `cache` も同じ形） |
 | `toc` | カタログから目次（`<wiki_dir>/README.md`）を生成し、`related` の相互リンクを双方向にし、各ページのフロントマターの `title` / `audience` / `updated` をカタログに揃える |
 | `post` | `post_commands` を実行する。ファイルの指定が無ければ何も実行しない。`{files}` を他の文字と連結した引数があれば、どのコマンドも実行せずに拒否する |
 
@@ -374,6 +376,7 @@ lint がこれらを前提に検査するため、設定では変えられない
 
 - **ページ単位**: 状態はカタログの `source_commit` と Wiki のファイルの有無にある。検証を通ったページはそのつど `checkpoint` が記録するので、止まったあとに `sync` を実行し直せば残りのページだけを処理する。`toc` は何度実行しても同じ結果になる。
 - **未解決の指摘の引き継ぎ**: 最大ラウンドの fix のあとも指摘が残ったページは、`.agentic-doc/work/<page-id>/findings.json` に指摘とページ本文のハッシュを保存する。次の `sync` でこれが見つかり、本文のハッシュが一致すれば、research と write を飛ばして指摘を fix に渡す。一致しなければ人が手で直したとみなして破棄し、通常の処理に戻す。`checkpoint` を書いたときに削除する。
+- **research と書き込み済みの本文のキャッシュ**: research は最も重い工程なので、中断後は有効な結果を再利用する。research のエージェントはメモ（`research.md`）を作業ディレクトリに書き、返した結果を呼び出し側が `cache save research <id> <file>` で保存する（Workflow は返り値のオブジェクトを渡し、失敗したら 1 回やり直す）。このコマンドが結果のスキーマ検証と `research.json` の配置、キーの記録（`cache.json`）を行う。キーは、ページの `title`・`brief` と、`sources` に展開されるファイルの内容（作業ツリー）のハッシュで、無関係なコミットでは無効にならない。write のあと、および fix の各ラウンドのあとに `cache save written` を行い、本文と research のキーから決まるキーを記録する。次の `sync` で `plan` が各対象の `cache` を示し、research が有効なら research を、本文も有効なら research と write を飛ばして、write への入力（`research_path`・`note_path`）か検証から再開する。整形（`post_commands` など）で本文が変わると、保存済みの指摘と書き込み済みのキャッシュは本文のハッシュが合わなくなる。そのため integrate のあと、checkpoint されていない（`unresolved` と `unverified` の）ページについて、指摘（`unresolved` のみ）と `cache save written` を保存し直す。`checkpoint` が作業ディレクトリごと削除する。
 - **作業ディレクトリの ignore**: スクリプトが作業ディレクトリを最初に作るとき、`skills/wiki/assets/work/.gitignore.in` を `.agentic-doc/work/.gitignore` としてコピーする（既にあれば上書きしない）。中身は `*` だけで、ディレクトリ全体が git から見えなくなる。導入先の `.gitignore` は変更しない。
 - Claude Code の `resumeFromRunId` は同じセッション内でしか使えないので、主な仕組みにしない。
 
@@ -414,7 +417,7 @@ lint がこれらを前提に検査するため、設定では変えられない
 | （初回実行） | Python 本体も uv のキャッシュも無い環境で、初回の実行が通る |
 | （配布経路） | Codex で、このリポジトリの `marketplace.json`（`source: "./"`）からインストールして動く。Claude Code で、git のマーケットプレイスからインストールしてキャッシュに置かれた状態で動く |
 
-**fbx-view の移行**: `_catalogue.json` を `catalogue.json` にリネームし、設定ファイルを作る。setup の更新フロー（7.1 の 4）で扱える。
+**fbx-view の移行**: 設定ファイルを作り、`_catalogue.json`（`chapters` が無く、`language` と `citation_style` を持つ旧形式）を `catalogue migrate` で `catalogue.json` に変換する。setup の更新フロー（7.1 の 4）で扱える。
 
 ## 13. 既存資産の扱い
 

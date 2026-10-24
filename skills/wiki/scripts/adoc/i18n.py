@@ -43,6 +43,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "report_drift_sync": "sync --pages {ids} (the text no longer matches the code)",
         "report_fix_lint": "lint {ids} to see the details, then fix them",
         "report_stamp_quiet": "stamp --pages {ids} (sources changed, but the text is still accurate)",
+        "report_changed_unaudited": "audit without --lint-only to check {ids} against the code (or sync --pages {ids})",
     },
     "ja": {
         "state_missing": "未生成",
@@ -86,6 +87,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "report_drift_sync": "sync --pages {ids}（本文がコードと食い違う）",
         "report_fix_lint": "lint {ids} で詳細を見て直す",
         "report_stamp_quiet": "stamp --pages {ids}（sources は変わったが本文に影響なし）",
+        "report_changed_unaudited": "--lint-only を付けずに audit を実行して {ids} を確かめる（または sync --pages {ids}）",
     },
 }
 

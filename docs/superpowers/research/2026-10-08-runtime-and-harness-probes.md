@@ -6,13 +6,10 @@
 - **スキルからスクリプトを指す書き方**: 「この SKILL.md と同じディレクトリからの相対パス」。Claude Code・VS Code（Copilot）・Codex の 3 つで動いた。`${PLUGIN_ROOT}` はスキル本文では展開されないので使わない。
 - **Workflow へのパスの渡し方**: 入口スキルが `${CLAUDE_PLUGIN_ROOT}` を Workflow の `args.plugin_root` に入れて渡す。Workflow の `meta.name` は入口スキルと別の名前にする。
 - **マニフェスト**: ルートに Agent Plugins 1.0 の `plugin.json`、`.claude-plugin/plugin.json` に Claude Code 用。Workflow は `workflows` で `./com.anthropic.claude-code/workflows/` を指す。
-- **未確認**（計画 2〜4 で確かめる。検証済みと扱わないこと）:
-  - Windows と Linux での動作
-  - 両方のマニフェストを置いたときに VS Code が読み込む名前
-  - Python 本体が未導入の環境での初回実行（3.2 節の計測は uv 管理の Python が導入済みの状態で行った）
-  - リポジトリ内のファイル名が非 ASCII の場合（3.2 節で確かめたのは、リポジトリとスクリプトの置き場所のパスだけ）
-  - Claude Code で git や URL のマーケットプレイスからインストールし、キャッシュに置かれた場合
-  - Codex で両方のマニフェストを置いた場合と、本番と同じ `source: "./"`（マーケットプレイスとプラグインが同じルート）の構成
+- **未確認**（計画 4 の受入検証後の状態。5 節に根拠がある。確かめたものは検証済み、残りは理由つきで未確認のまま）:
+  - 確かめた: Linux と Windows でのスクリプトとテスト（CI の 3 OS）。Python 本体が未導入の環境での初回実行（CI の `first-run` ジョブ、3 OS）。Claude Code で git のマーケットプレイスからインストールし、キャッシュに置かれた場合。Codex で両方のマニフェストを置いた場合と、本番と同じ `source: "./"` の構成。
+  - 未確認（所有者の実機が要る）: VS Code（Copilot）での動作と、両方のマニフェストを置いたときに表示されるプラグイン名（手順書 `docs/superpowers/acceptance/copilot-degraded.md`）。Windows の PowerShell 実機での動作、`core.autocrlf=true` での改行、非 ASCII のファイル名の表示（`docs/superpowers/acceptance/windows-powershell.md`）。
+  - 未確認（理由つき）: リポジトリ内のファイル名が非 ASCII の場合のエージェント経由の実行。スクリプトは単体テストで確かめた（`tests/` に非 ASCII と空白を含むファイル名のケースがある）が、Claude Code と Codex の実行では、そのようなファイルを持つ導入先を使っていない。
 
 計画 1（`docs/superpowers/plans/2026-10-08-agentic-doc-plan1-foundation.md`）の Task 1〜3 の結果。プローブは `spikes/` に置いた使い捨てのコードで、git には入れていない。
 
@@ -139,3 +136,36 @@ Mermaid の構文検査は、Node と mermaid がある環境でだけ動く任�
 - 入口スキルは Workflow をバックグラウンドで起動し、完了の通知を受けてから結果を報告した。`claude -p` でも、通知を待ってから終了した。
 - エージェントがソースを import して確かめたため、導入先に `__pycache__/` が残った（導入先の `.gitignore` で無視されていなければ未追跡ファイルになる）。
 - `checkpoint` が作業ディレクトリのページを消したあと、章の空ディレクトリ（`.agentic-doc/work/overview/`）が残る。git からは見えない。
+
+## 5. 計画 4 の受入検証（2026-10-10〜10-23）
+
+環境: macOS（arm64）、Claude Code 2.1.x（`claude -p`）、Codex CLI 0.162.0、CI は GitHub Actions（ubuntu・macos・windows）。
+
+| 確かめたこと | 結果 |
+| --- | --- |
+| Python 本体とキャッシュが無い状態での初回実行 | CI の `first-run` ジョブ（pwsh、3 OS）が通った。uv が管理の Python を取得し、`config check` が ok になる |
+| Claude Code で git のマーケットプレイスからインストール | `AJpon/agentic-doc@docs/plan4-acceptance` から導入できた。キャッシュ（`~/.claude/plugins/cache/agentic-doc-dev/agentic-doc/0.1.0`）から `setup`、`outline`、`sync` が動いた |
+| agentic-doc 自身（日本語、`uv.lock` を除外） | `setup`、`outline`（6 章）、`sync` を通して、20 ページが「最新」、`lint` 0 件、`catalogue check` ok、`audit --lint-only` が終了コード 0 になった。`sync` は利用制限で何度も止まり、そのたびに同じコマンドで再開して完了した。生成ページの点検（定数、テスト名、コマンド数、出典の行番号）で、実コードとの食い違いはなかった |
+| Codex（`codex plugin marketplace add`、`codex plugin add`） | 両方のマニフェスト、`source: "./"` の構成で導入できた。`setup`、`outline`（4 ページ）、`sync`（4 ページ検証済み、95 秒）、`status`、`audit`、`stamp --dry-run` が通った |
+| 別言語・別規模（BetterExperience、C#、英語、Codex で実行） | `outline` が 3 章 5 ページ。`sync` で app 章の 2 ページが検証済み（3 分 14 秒）、`lint` 0 件 |
+| fbx-view の旧形式からの移行 | `catalogue migrate` で 5 章 24 ページに変換し、`status` が旧ツールと同じ「24 ページ最新」になった。`lint` の 4 件は引用の修正で解消した。移行後に 2 ページを書き直して旧版と比べると、記述量は同水準（`render/skinning` 16.7 KB→14.2 KB、出典 39→43 件。`overview/product` 9.7 KB→11.7 KB）で、抜き取りの出典は実コードと一致した |
+| 中断と再開 | `unverify` と `checkpoint` により、中断したページは「未検証」で残り、次の `sync` が続きから処理した。計画 4 で、research の結果と書き込み済みの本文のキャッシュを入れた。8 回の再開で、キャッシュ済みの research がやり直されたことはなかった |
+
+分かったこと（計画 4 で直したもの）:
+
+- 除外の pathspec があると、肯定の pathspec が 1 ファイルだけのときに `git ls-files` が 0 件を返すことがある（Apple Git 2.50.1）。除外は Python 側で引くようにした。
+- `catalogue migrate` は、今の `exclude` で全て除外される `sources` を、エラーではなく警告にした。
+- `plan` の出力の転記で、エージェントが対象を落とすのを検知する（`target_count`）。再開したページは整形の対象に含める。
+- `cache show` が、本文の無いページを「書き込み済み」と判定しないようにした。
+
+分かったこと（利用者への注意）:
+
+- `claude -p` は、バックグラウンドの Workflow を 600 秒で止める。`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` を付ける。
+- 作業クローンを `.claude` の下に置くと、Write が `docs/wiki/*.md` を「sensitive file」として拒否することがある。未信頼のワークスペースでは `.claude/settings.json` の許可も読まれない。`sync` を試すクローンは `.claude` の外に置く。
+- 書き込みが全て拒否されても、`claude -p` は終了コード 0 で終わる。成否は `status` で確かめる。
+- 利用制限で止まった `sync` のログは、制限の 1 行だけになる。どのページが済んだかは `status` で見る。
+- Codex の縮退動作では、検証が一括になり、観点ごとの独立した検証パスがない。検証は Claude Code より弱い。
+- `toc` は `<wiki_dir>/README.md` を再生成する。手で書いた導入文は残らない。
+- fbx-view の worktree では、`pre-commit` の `uv-sync` が失敗する（ライセンス上、`fbx` の wheel をコミットしていないため）。環境の問題で、agentic-doc の問題ではない。
+
+先送り（計画 4 に含めない）: `unresolved` の名前の衝突、`audit` の `plan` が作業ディレクトリを作ること、`outline --force` 後に旧カタログにしかないページのファイルが残ること。進捗のログ（`log.jsonl`）、`status --verbose` の段階表示、`checkpoint` が検証の通過を確かめる門、`outline` と `audit` のキャッシュ、`sync --limit N` は計画 5 で扱う。

@@ -37,6 +37,25 @@ def test_exclude_applies(repo):
     assert gitutil.ls_files(repo.root, [], ["vendor/**"]) == ["src/a.py"]
 
 
+@pytest.mark.parametrize("exclude", ["zzz/**", "abc/**", "x", "vendor/**"])
+def test_ls_files_single_nested_literal_with_exclude(repo, exclude):
+    # Apple Git 2.50 は、肯定の pathspec が 1 ファイルだけのとき、除外の pathspec の長さ次第で 0 件を返す
+    repo.write("a/b/c.py", "a")
+    repo.write("src/pkg/main.py", "m")
+    repo.write("vendor/x.py", "x")
+    repo.commit()
+    assert gitutil.ls_files(repo.root, ["a/b/c.py"], [exclude]) == ["a/b/c.py"]
+    assert gitutil.ls_files(repo.root, ["src/pkg/main.py"], [exclude]) == ["src/pkg/main.py"]
+
+
+def test_ls_files_exclude_still_removes(repo):
+    repo.write("vendor/x.py", "x")
+    repo.write("src/a.py", "a")
+    repo.commit()
+    assert gitutil.ls_files(repo.root, ["vendor/x.py"], ["vendor/**"]) == []
+    assert gitutil.ls_files(repo.root, ["**/*.py"], ["vendor/**"]) == ["src/a.py"]
+
+
 def test_untracked_lists_new_unignored_files(repo):
     repo.write(".gitignore", "*.log\n")
     repo.commit()

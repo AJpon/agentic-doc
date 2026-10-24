@@ -11,6 +11,7 @@
       "description": "コードベースから Markdown Wiki を生成し、コードの変化に追随させ続ける",
       "version": "0.1.0",
       "source": "./",
+      "license": "MIT",
       "author": {
         "name": "pon",
         "email": "pon@ajpon.com"

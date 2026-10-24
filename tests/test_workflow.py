@@ -62,9 +62,16 @@ def target(pid: str, pending: int = 0, state: str = "missing") -> dict:
             "pending": pending}
 
 
+def cached(t: dict, research: bool = True, written: bool = False) -> dict:
+    pid = t["id"]
+    hit = {"hit": True, "path": f".agentic-doc/work/{pid}/research.json", "note_path": f".agentic-doc/work/{pid}/research.md"}
+    return {**t, "cache": {"research": hit if research else {"hit": False}, "written": {"hit": written}}}
+
+
 def ok_plan(targets: list[dict]) -> str:
     return json.dumps({"head": HEAD, "today": TODAY, "wiki_dir": "docs/wiki", "work_dir": ".agentic-doc/work",
-                       "targets": targets, "skipped": [], "warnings": {"uncommitted": [], "untracked": []}})
+                       "targets": targets, "target_count": len(targets), "skipped": [],
+                       "warnings": {"uncommitted": [], "untracked": []}})
 
 
 def research(pid: str) -> dict:
@@ -85,6 +92,7 @@ def page_responses(pid: str, dead=frozenset(), claim=None, research_ok=True) -> 
         (lab(f"verify:claim:{pid}"), None if "verify" in dead else (claim or verdict("claim"))),
         (lab(f"record:{pid}"), cmdres("")),
         (f"^fix[12]:{re.escape(pid)}$", {"changed": ["x"], "disputed": []}),
+        (f"^cache:(research|written):{re.escape(pid)}", cmdres("")),
     ]
     if research_ok:
         out += [(lab(f"research:{pid}"), None if f"research:{pid}" in dead else research(pid)),
@@ -191,6 +199,14 @@ def test_pending_findings_skip_research_and_write():
     assert r["result"]["pages"][0]["result"] == "verified"
 
 
+def test_resumed_page_reaches_post_commands():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x", pending=1, state="unverified")]))),
+                 ("^integrate$", INTEGRATE), (lab("findings:a/x"), cmdres(json.dumps([BLOCKER])))]
+    responses += page_responses("a/x", research_ok=False)
+    r = run_wf(SYNC, responses)
+    assert inputs(call(r, "integrate"))["written_files"] == ["docs/wiki/a/x.md"]
+
+
 def test_stale_pending_findings_fall_back_to_research():
     responses = [("^plan$", cmdres(ok_plan([target("a/x", pending=1, state="unverified")]))),
                  ("^integrate$", INTEGRATE), (lab("findings:a/x"), cmdres("null"))]
@@ -213,6 +229,12 @@ def test_at_most_two_pages_in_flight():
 def test_bad_head_throws():
     bad = json.dumps({**json.loads(ok_plan([])), "head": "HEAD"})
     assert "head" in run_wf(SYNC, [("^plan$", cmdres(bad))])["error"]
+
+
+def test_truncated_plan_transcription_throws():
+    short = json.dumps({**json.loads(ok_plan([target("a/x")])), "target_count": 2})
+    r = run_wf(SYNC, [("^plan$", cmdres(short))])
+    assert "target_count" in r["error"]
 
 
 def test_failed_plan_throws_with_stderr():
@@ -311,3 +333,110 @@ def test_failed_unverify_throws():
     r = run_wf(SYNC, [("^plan$", cmdres(ok_plan([t]))),
                       ("^unverify$", {"exit_code": 2, "stdout": "", "stderr": "refused: locked"})])
     assert "locked" in r["error"]
+
+
+def test_fresh_research_is_saved_before_write():
+    r = run_wf(SYNC, clean_responses(["a/x"]))
+    save = inputs(call(r, "cache:research:a/x"))
+    assert save["command"] == f"{SCRIPT} cache save research a/x <FILE>"
+    assert json.loads(save["file"]) == research("a/x")
+    assert labels(r).index("research:a/x") < labels(r).index("cache:research:a/x") < labels(r).index("write:a/x")
+    w = inputs(call(r, "write:a/x"))
+    assert w["research_path"] == ".agentic-doc/work/a/x/research.json"
+    assert w["note_path"] == ".agentic-doc/work/a/x/research.md" and "research" not in w
+
+
+def test_research_cache_save_is_retried_once():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("cache:research:a/x"), {"__seq": [cmdres("", 2), cmdres("")]})]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert labels(r).count("cache:research:a/x") == 2
+    assert r["result"]["pages"][0]["result"] == "verified"
+
+
+def test_failed_research_cache_save_fails_the_page():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("cache:research:a/x"), cmdres("", 2))]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert r["result"]["failed"] == ["a/x"] and "write:a/x" not in labels(r)
+
+
+def test_cached_research_skips_the_research_agent():
+    responses = [("^plan$", cmdres(ok_plan([cached(target("a/x"))]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", research_ok=False) + [(lab("write:a/x"), written("a/x"))]
+    r = run_wf(SYNC, responses)
+    assert "research:a/x" not in labels(r) and "cache:research:a/x" not in labels(r)
+    w = inputs(call(r, "write:a/x"))
+    assert w["research_path"] == ".agentic-doc/work/a/x/research.json"
+    assert w["note_path"] == ".agentic-doc/work/a/x/research.md"
+    assert r["result"]["pages"][0]["result"] == "verified"
+
+
+def test_written_page_goes_straight_to_verify():
+    t = cached(target("a/x", state="unverified"), written=True)
+    responses = [("^plan$", cmdres(ok_plan([t]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", research_ok=False)
+    r = run_wf(SYNC, responses)
+    assert not any(label in labels(r) for label in ("research:a/x", "write:a/x"))
+    assert "verify:citation:a/x" in labels(r) and r["result"]["pages"][0]["result"] == "verified"
+    assert inputs(call(r, "integrate"))["written_files"] == ["docs/wiki/a/x.md"]
+
+
+def test_written_page_fix_gets_the_cached_note():
+    t = cached(target("a/x", state="unverified"), written=True)
+    responses = [("^plan$", cmdres(ok_plan([t]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", research_ok=False, claim=verdict("claim", [BLOCKER]))
+    r = run_wf(SYNC, responses)
+    assert inputs(call(r, "fix1:a/x"))["note_path"] == ".agentic-doc/work/a/x/research.md"
+
+
+def test_written_cache_is_saved_after_write_and_after_each_fix():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE)]
+    responses += page_responses("a/x", claim=verdict("claim", [BLOCKER]))
+    r = run_wf(SYNC, responses)
+    seq = [label for label in labels(r) if label.startswith(("write:", "fix", "cache:written"))]
+    assert seq == ["write:a/x", "cache:written:a/x", "fix1:a/x", "cache:written:a/x", "fix2:a/x",
+                   "cache:written:a/x"]
+    assert inputs(call(r, "cache:written:a/x"))["command"] == f"{SCRIPT} cache save written a/x"
+
+
+def test_failed_written_cache_save_is_not_fatal():
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", INTEGRATE),
+                 (lab("cache:written:a/x"), cmdres("", 2))]
+    responses += page_responses("a/x")
+    r = run_wf(SYNC, responses)
+    assert r["result"]["pages"][0]["result"] == "verified"
+
+
+def _resave_run(claim=None, dead=frozenset(), integrate=INTEGRATE):
+    responses = [("^plan$", cmdres(ok_plan([target("a/x")]))), ("^integrate$", integrate),
+                 (r"^resave:", cmdres(""))]
+    responses += page_responses("a/x", claim=claim, dead=dead)
+    return run_wf(SYNC, responses)
+
+
+def test_unresolved_page_findings_and_cache_are_saved_again_after_integrate():
+    r = _resave_run(claim=verdict("claim", [BLOCKER]))
+    seq = [label for label in labels(r) if label in ("integrate", "resave:findings:a/x", "resave:cache:a/x")]
+    assert seq[0] == "integrate" and sorted(seq[1:]) == ["resave:cache:a/x", "resave:findings:a/x"]
+    f = inputs(call(r, "resave:findings:a/x"))
+    assert f["command"] == f"{SCRIPT} findings save a/x <FILE>"
+    assert json.loads(f["file"]) == [{**BLOCKER, "lens": "claim"}]
+    assert inputs(call(r, "resave:cache:a/x"))["command"] == f"{SCRIPT} cache save written a/x"
+
+
+def test_unverified_page_cache_is_saved_again_after_integrate():
+    r = _resave_run(dead={"verify"})
+    assert "resave:cache:a/x" in labels(r) and "resave:findings:a/x" not in labels(r)
+
+
+def test_verified_page_needs_no_resave():
+    r = _resave_run()
+    assert not any(label.startswith("resave:") for label in labels(r))
+
+
+def test_no_resave_when_integrate_failed():
+    r = _resave_run(claim=verdict("claim", [BLOCKER]), integrate=None)
+    assert not any(label.startswith("resave:") for label in labels(r))
